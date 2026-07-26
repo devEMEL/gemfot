@@ -1,40 +1,38 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {Ownable} from '@solady/auth/Ownable.sol';
+import {Ownable} from "@solady/auth/Ownable.sol";
 
-import {AccessControl} from '@openzeppelin/contracts/access/AccessControl.sol';
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
-import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import {BalanceDelta} from '@uniswap/v4-core/src/types/BalanceDelta.sol';
-import {Currency, CurrencyLibrary} from '@uniswap/v4-core/src/types/Currency.sol';
-import {Hooks, IHooks} from '@uniswap/v4-core/src/libraries/Hooks.sol';
-import {IPoolManager} from '@uniswap/v4-core/src/interfaces/IPoolManager.sol';
-import {LiquidityAmounts} from '@uniswap/v4-core/test/utils/LiquidityAmounts.sol';
-import {PoolId, PoolIdLibrary} from '@uniswap/v4-core/src/types/PoolId.sol';
-import {PoolKey} from '@uniswap/v4-core/src/types/PoolKey.sol';
-import {StateLibrary} from '@uniswap/v4-core/src/libraries/StateLibrary.sol';
-import {TickMath} from '@uniswap/v4-core/src/libraries/TickMath.sol';
+import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import {Hooks, IHooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
+import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
+import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
+import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
+import {Currency, CurrencyLibrary} from "@uniswap/v4-core/src/types/Currency.sol";
+import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
+import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {LiquidityAmounts} from "@uniswap/v4-core/test/utils/LiquidityAmounts.sol";
 
-import {CurrencySettler} from '@gemfot/libraries/CurrencySettler.sol';
-import {MemecoinFinder} from '@gemfot/types/MemecoinFinder.sol';
-import {PositionManager} from '@gemfot/PositionManager.sol';
-import {ProtocolRoles} from '@gemfot/libraries/ProtocolRoles.sol';
-import {TickFinder} from '@gemfot/types/TickFinder.sol';
+import {GemFotManager} from "@gemfot/GemFotManager.sol";
+import {CurrencySettler} from "@gemfot/libraries/CurrencySettler.sol";
+import {ProtocolRoles} from "@gemfot/libraries/ProtocolRoles.sol";
+import {MemecoinFinder} from "@gemfot/types/MemecoinFinder.sol";
+import {TickFinder} from "@gemfot/types/TickFinder.sol";
 
-import {IMemecoin} from '@gemfot-interfaces/IMemecoin.sol';
-
+import {IMemecoin} from "@gemfot-interfaces/IMemecoin.sol";
 
 /**
  * This hook allows us to create a single sided liquidity position (Plunge Protection) that is
- * placed 1 tick below spot price, using the ETH fees accumulated.
+ * placed 1 tick below spot price, using the USDC fees accumulated.
  *
  * After each deposit into the BidWall the position is rebalanced to ensure it remains 1 tick
  * below spot. This spot will be determined by the tick value before the triggering swap.
  */
 contract BidWall is AccessControl, Ownable {
-
     using CurrencyLibrary for Currency;
     using CurrencySettler for Currency;
     using Hooks for IHooks;
@@ -46,20 +44,20 @@ contract BidWall is AccessControl, Ownable {
     error CallerIsNotCreator();
     error NotPositionManager();
 
-    /// Emitted when the BidWall is first initialised with ETH
-    event BidWallInitialized(PoolId indexed _poolId, uint _eth, int24 _tickLower, int24 _tickUpper);
+    /// Emitted when the BidWall is first initialised with USDC
+    event BidWallInitialized(PoolId indexed _poolId, uint _usdc, int24 _tickLower, int24 _tickUpper);
 
     /// Emitted when a BidWall receives a deposit
     event BidWallDeposit(PoolId indexed _poolId, uint _added, uint _pending);
 
-    /// Emitted when the BidWall is repositioned under an updated tick, or with additional ETH
-    event BidWallRepositioned(PoolId indexed _poolId, uint _eth, int24 _tickLower, int24 _tickUpper);
+    /// Emitted when the BidWall is repositioned under an updated tick, or with additional USDC
+    event BidWallRepositioned(PoolId indexed _poolId, uint _usdc, int24 _tickLower, int24 _tickUpper);
 
-    /// Emitted when non-ETH tokens received are transferrer to the memecoin treasury
+    /// Emitted when non-USDC tokens received are transferrer to the memecoin treasury
     event BidWallRewardsTransferred(PoolId indexed _poolId, address _recipient, uint _tokens);
 
     /// Emitted when the BidWall is closed
-    event BidWallClosed(PoolId indexed _poolId, address _recipient, uint _eth);
+    event BidWallClosed(PoolId indexed _poolId, address _recipient, uint _usdc);
 
     /// Emitted when the BidWall is disabled or enabled
     event BidWallDisabledStateUpdated(PoolId indexed _poolId, bool _disabled);
@@ -77,7 +75,7 @@ contract BidWall is AccessControl, Ownable {
      * @member initialized If the BidWall has been initialized
      * @member tickLower The current lower tick of the BidWall
      * @member tickUpper The current upper tick of the BidWall
-     * @member pendingETHFees The amount of ETH fees waiting to be put into the BidWall until threshold is crossed
+     * @member pendingUSDCFees The amount of USDC fees waiting to be put into the BidWall until threshold is crossed
      * @member cumulativeSwapFees The total amount of swap fees accumulated for the pool
      */
     struct PoolInfo {
@@ -85,7 +83,7 @@ contract BidWall is AccessControl, Ownable {
         bool initialized;
         int24 tickLower;
         int24 tickUpper;
-        uint pendingETHFees;
+        uint pendingUSDCFees;
         uint cumulativeSwapFees;
     }
 
@@ -102,25 +100,29 @@ contract BidWall is AccessControl, Ownable {
     uint internal _swapFeeThreshold;
 
     /// Maps our poolId to the `PoolInfo` struct for bidWall data
-    mapping (PoolId _poolId => PoolInfo _poolInfo) public poolInfo;
+    mapping(PoolId _poolId => PoolInfo _poolInfo) public poolInfo;
 
     /// Maps the last transaction time for a pool BidWall
-    mapping (PoolId _poolId => uint _timestamp) public lastPoolTransaction;
+    mapping(PoolId _poolId => uint _timestamp) public lastPoolTransaction;
 
     /**
-     * Set up our PoolManager and native ETH token.
+     * Set up our PoolManager and native USDC token.
      *
-     * @param _nativeToken The ETH token being used in the {PositionManager}
+     * @param _nativeToken The USDC token being used in the {PositionManager}
      * @param _poolManager The Uniswap V4 {PoolManager}
      * @param _protocolOwner The address of the protocol owner
      */
-    constructor (address _nativeToken, address _poolManager, address _protocolOwner) {
+    constructor(
+        address _nativeToken,
+        address _poolManager,
+        address _protocolOwner
+    ) {
         nativeToken = _nativeToken;
         poolManager = IPoolManager(_poolManager);
 
         // Set our initial swapFeeThreshold and emit an update for the amount
-        _swapFeeThreshold = 0.1 ether;
-        emit FixedSwapFeeThresholdUpdated(0.1 ether);
+        _swapFeeThreshold = 100 * 10 ** 6;
+        emit FixedSwapFeeThresholdUpdated(100 * 10 ** 6);
 
         // Emit our initial `staleTimeWindow` update
         emit StaleTimeWindowUpdated(staleTimeWindow);
@@ -138,7 +140,9 @@ contract BidWall is AccessControl, Ownable {
      *
      * @return bool Set to `true` if the hook is enabled, `false` if it is disabled
      */
-    function isBidWallEnabled(PoolId _poolId) public view returns (bool) {
+    function isBidWallEnabled(
+        PoolId _poolId
+    ) public view returns (bool) {
         return !poolInfo[_poolId].disabled;
     }
 
@@ -150,34 +154,36 @@ contract BidWall is AccessControl, Ownable {
      * and ready to receive the swap fees.
      *
      * @param _poolKey The PoolKey to modify the BidWall of
-     * @param _ethSwapAmount The amount of ETH swap fees added to BidWall
+     * @param _usdcSwapAmount The amount of USDC swap fees added to BidWall
      * @param _currentTick The current tick of the pool
      * @param _nativeIsZero If the native token is `currency0`
      */
     function deposit(
         PoolKey memory _poolKey,
-        uint _ethSwapAmount,
+        uint _usdcSwapAmount,
         int24 _currentTick,
         bool _nativeIsZero
     ) public onlyPositionManager {
         // If we have no fees to swap, then exit early
-        if (_ethSwapAmount == 0) return;
+        if (_usdcSwapAmount == 0) {
+            return;
+        }
 
         // Increase our cumulative and pending fees
         PoolId poolId = _poolKey.toId();
         PoolInfo storage _poolInfo = poolInfo[poolId];
-        _poolInfo.cumulativeSwapFees += _ethSwapAmount;
-        _poolInfo.pendingETHFees += _ethSwapAmount;
+        _poolInfo.cumulativeSwapFees += _usdcSwapAmount;
+        _poolInfo.pendingUSDCFees += _usdcSwapAmount;
 
         // Update the last transaction timestamp
         lastPoolTransaction[poolId] = block.timestamp;
 
         // Send an event to notify that BidWall has received funds
-        emit BidWallDeposit(poolId, _ethSwapAmount, _poolInfo.pendingETHFees);
+        emit BidWallDeposit(poolId, _usdcSwapAmount, _poolInfo.pendingUSDCFees);
 
         // If we haven't yet crossed a threshold, then we just increase the amount of
         // pending fees to calculate against next time.
-        if (_poolInfo.pendingETHFees < _getSwapFeeThreshold(_poolInfo.cumulativeSwapFees)) {
+        if (_poolInfo.pendingUSDCFees < _getSwapFeeThreshold(_poolInfo.cumulativeSwapFees)) {
             return;
         }
 
@@ -208,7 +214,7 @@ contract BidWall is AccessControl, Ownable {
         // If the BidWall has no pending fees, then we will have nothing to extract
         // early, so we don't need to process our reposition.
         PoolInfo storage _poolInfo = poolInfo[poolId];
-        if (_poolInfo.pendingETHFees == 0) {
+        if (_poolInfo.pendingUSDCFees == 0) {
             return;
         }
 
@@ -225,29 +231,34 @@ contract BidWall is AccessControl, Ownable {
      * @param _currentTick The current tick of the pool
      * @param _nativeIsZero If the native token is `currency0`
      */
-    function _reposition(PoolKey memory _poolKey, PoolInfo storage _poolInfo, int24 _currentTick, bool _nativeIsZero) internal {
-        // Reset pending ETH token fees as we will be processing a bidwall initialization
+    function _reposition(
+        PoolKey memory _poolKey,
+        PoolInfo storage _poolInfo,
+        int24 _currentTick,
+        bool _nativeIsZero
+    ) internal {
+        // Reset pending USDC token fees as we will be processing a bidwall initialization
         // or a rebalance.
-        uint totalFees = _poolInfo.pendingETHFees;
-        _poolInfo.pendingETHFees = 0;
+        uint totalFees = _poolInfo.pendingUSDCFees;
+        _poolInfo.pendingUSDCFees = 0;
 
-        uint ethWithdrawn;
+        uint usdcWithdrawn;
         uint memecoinWithdrawn;
 
         // Check if the BidWall has been initialized before, then we have a position
         if (_poolInfo.initialized) {
             // Remove tokens from our current position
-            (ethWithdrawn, memecoinWithdrawn) = _removeLiquidity({
+            (usdcWithdrawn, memecoinWithdrawn) = _removeLiquidity({
                 _key: _poolKey,
                 _nativeIsZero: _nativeIsZero,
                 _tickLower: _poolInfo.tickLower,
                 _tickUpper: _poolInfo.tickUpper
             });
 
-            // Send the received ETH to the {PositionManager}, as that will be supplying the ETH
+            // Send the received USDC to the {PositionManager}, as that will be supplying the USDC
             // tokens to create the new position.
-            if (ethWithdrawn != 0) {
-                IERC20(nativeToken).transfer(msg.sender, ethWithdrawn);
+            if (usdcWithdrawn != 0) {
+                IERC20(nativeToken).transfer(msg.sender, usdcWithdrawn);
             }
         } else {
             // If this is the first time we are adding liquidity, then we can set our
@@ -265,7 +276,7 @@ contract BidWall is AccessControl, Ownable {
          *      an overly generous price when the BidWall is triggered.
          *   2. The tick has moved AGAINST the native token, meaning that we will be creating our position
          *      to give a higher native token value. This means that liquidity calculations called within
-         *      the `_addETHLiquidity` will actually result in requiring both native _and_ memecoin tokens
+         *      the `_addUSDCLiquidity` will actually result in requiring both native _and_ memecoin tokens
          *      to be settled. If this is the case then we instead need to use the `slot0` tick rather than
          *      the beforeSwap tick value provided in `_currentTick`.
          *
@@ -281,16 +292,16 @@ contract BidWall is AccessControl, Ownable {
 
         // Create our liquidity position; including any tokens withdrawn from our previous position if
         // set, as well as the additional swap fees.
-        _addETHLiquidity({
+        _addUSDCLiquidity({
             _key: _poolKey,
             _nativeIsZero: _nativeIsZero,
             _currentTick: _currentTick,
-            _ethAmount: ethWithdrawn + totalFees
+            _usdcAmount: usdcWithdrawn + totalFees
         });
 
         // If we have memecoins available, then we transfer those to the treasury
         if (memecoinWithdrawn != 0) {
-            // Find our non-ETH token and the {TokenTreasury} attached to it
+            // Find our non-USDC token and the {TokenTreasury} attached to it
             address memecoin = address(_poolKey.memecoin(nativeToken));
             address memecoinTreasury = _getMemecoinTreasury(_poolKey, memecoin);
 
@@ -299,7 +310,7 @@ contract BidWall is AccessControl, Ownable {
             emit BidWallRewardsTransferred(poolId, memecoinTreasury, memecoinWithdrawn);
         }
 
-        emit BidWallRepositioned(poolId, ethWithdrawn + totalFees, _poolInfo.tickLower, _poolInfo.tickUpper);
+        emit BidWallRepositioned(poolId, usdcWithdrawn + totalFees, _poolInfo.tickLower, _poolInfo.tickUpper);
     }
 
     /**
@@ -310,7 +321,10 @@ contract BidWall is AccessControl, Ownable {
      *
      * @return memecoinTreasury_ The treasury address for the memecoin
      */
-    function _getMemecoinTreasury(PoolKey memory _poolKey, address _memecoin) internal view virtual returns (address memecoinTreasury_) {
+    function _getMemecoinTreasury(
+        PoolKey memory _poolKey,
+        address _memecoin
+    ) internal view virtual returns (address memecoinTreasury_) {
         memecoinTreasury_ = IMemecoin(_memecoin).treasury();
     }
 
@@ -322,7 +336,10 @@ contract BidWall is AccessControl, Ownable {
      *
      * @return creator_ The creator address for the memecoin
      */
-    function _getMemecoinCreator(PoolKey memory _poolKey, address _memecoin) internal view virtual returns (address creator_) {
+    function _getMemecoinCreator(
+        PoolKey memory _poolKey,
+        address _memecoin
+    ) internal view virtual returns (address creator_) {
         creator_ = IMemecoin(_memecoin).creator();
     }
 
@@ -337,18 +354,25 @@ contract BidWall is AccessControl, Ownable {
      * @param _key The PoolKey that is being updated
      * @param _disable If the BidWall is being disabled (true) or enabled (false)
      */
-    function setDisabledState(PoolKey memory _key, bool _disable) external {
+    function setDisabledState(
+        PoolKey memory _key,
+        bool _disable
+    ) external {
         // Ensure that the caller is the pool creator
-        if (msg.sender != _getMemecoinCreator(_key, address(_key.memecoin(nativeToken)))) revert CallerIsNotCreator();
+        if (msg.sender != _getMemecoinCreator(_key, address(_key.memecoin(nativeToken)))) {
+            revert CallerIsNotCreator();
+        }
 
         // We only need to process the following logic if anything is changing
         PoolInfo storage _poolInfo = poolInfo[_key.toId()];
-        if (_disable == _poolInfo.disabled) return;
+        if (_disable == _poolInfo.disabled) {
+            return;
+        }
 
         // If we are disabling our BidWall, then we want to also remove the current liquidity. We
         // need to send this through the {PositionManager} so that it can open a {PoolManager} lock.
         if (_disable) {
-            PositionManager(payable(address(_key.hooks))).closeBidWall(_key);
+            GemFotManager(payable(address(_key.hooks))).closeBidWall(_key);
         }
 
         // Update our disabled flag
@@ -369,20 +393,22 @@ contract BidWall is AccessControl, Ownable {
      *
      * @param _key The PoolKey that we are closing the BidWall of
      */
-    function closeBidWall(PoolKey memory _key) external onlyPositionManager {
+    function closeBidWall(
+        PoolKey memory _key
+    ) external onlyPositionManager {
         // Unpack information required for our call
         bool nativeIsZero = nativeToken == Currency.unwrap(_key.currency0);
 
         PoolId poolId = _key.toId();
         PoolInfo storage _poolInfo = poolInfo[poolId];
 
-        uint ethWithdrawn;
+        uint usdcWithdrawn;
         uint memecoinWithdrawn;
 
         // If the pool has not yet been initialized, then there will be no liquidity to remove
         if (_poolInfo.initialized) {
             // Remove all liquidity from the BidWall
-            (ethWithdrawn, memecoinWithdrawn) = _removeLiquidity({
+            (usdcWithdrawn, memecoinWithdrawn) = _removeLiquidity({
                 _key: _key,
                 _nativeIsZero: nativeIsZero,
                 _tickLower: _poolInfo.tickLower,
@@ -393,26 +419,26 @@ contract BidWall is AccessControl, Ownable {
             _poolInfo.initialized = false;
         }
 
-        // Reset pending ETH fees for the pool. We also reset our `cumulativeSwapFees` as this is
+        // Reset pending USDC fees for the pool. We also reset our `cumulativeSwapFees` as this is
         // used to determine our threshold hits.
-        uint pendingETHFees = _poolInfo.pendingETHFees;
-        _poolInfo.pendingETHFees = 0;
+        uint pendingUSDCFees = _poolInfo.pendingUSDCFees;
+        _poolInfo.pendingUSDCFees = 0;
         _poolInfo.cumulativeSwapFees = 0;
 
         // Unwrap the non-native token and find the treasury address
         address memecoin = address(_key.memecoin(nativeToken));
         address memecoinTreasury = _getMemecoinTreasury(_key, memecoin);
 
-        // Pending ETH fees are stored in the {PositionManager}. So if we have a value there, then we
+        // Pending USDC fees are stored in the {PositionManager}. So if we have a value there, then we
         // will need to transfer this from the {PositionManager}, rather than this contract.
-        if (pendingETHFees != 0) {
-            IERC20(nativeToken).transferFrom(msg.sender, memecoinTreasury, pendingETHFees);
+        if (pendingUSDCFees != 0) {
+            IERC20(nativeToken).transferFrom(msg.sender, memecoinTreasury, pendingUSDCFees);
         }
 
-        // Transfer ETH withdrawn from the legacy position to the governance contract. We Avoid using
+        // Transfer USDC withdrawn from the legacy position to the governance contract. We Avoid using
         // safe transfer as this could brick calls if a malicious governance was set by the token.
-        if (ethWithdrawn != 0) {
-            IERC20(nativeToken).transfer(memecoinTreasury, ethWithdrawn);
+        if (usdcWithdrawn != 0) {
+            IERC20(nativeToken).transfer(memecoinTreasury, usdcWithdrawn);
         }
 
         // Transfer the flTokens withdrawn from the legacy position to the governance contract
@@ -421,7 +447,7 @@ contract BidWall is AccessControl, Ownable {
             emit BidWallRewardsTransferred(poolId, memecoinTreasury, memecoinWithdrawn);
         }
 
-        emit BidWallClosed(poolId, memecoinTreasury, ethWithdrawn + pendingETHFees);
+        emit BidWallClosed(poolId, memecoinTreasury, usdcWithdrawn + pendingUSDCFees);
     }
 
     /**
@@ -433,14 +459,16 @@ contract BidWall is AccessControl, Ownable {
      * @return amount1_ The {BidWall} token1 position
      * @return pendingEth_ The amount of ETH pending to be depositted into the {BidWall}
      */
-    function position(PoolId _poolId) public view returns (uint amount0_, uint amount1_, uint pendingEth_) {
+    function position(
+        PoolId _poolId
+    ) public view returns (uint amount0_, uint amount1_, uint pendingEth_) {
         // Get the BidWall tick range from our PoolInfo
         PoolInfo memory _poolInfo = poolInfo[_poolId];
 
         // If our pool is not initialized, then we don't have a position to query and we will
         // only have the pending fees to return
         if (!_poolInfo.initialized) {
-            return (0, 0, _poolInfo.pendingETHFees);
+            return (0, 0, _poolInfo.pendingUSDCFees);
         }
 
         // Retrieve the total liquidity of the pool
@@ -449,7 +477,7 @@ contract BidWall is AccessControl, Ownable {
             owner: address(this),
             tickLower: _poolInfo.tickLower,
             tickUpper: _poolInfo.tickUpper,
-            salt: 'bidwall'
+            salt: "bidwall"
         });
 
         // Get the current slot of the pool and find the amounts against the liquidity
@@ -462,7 +490,7 @@ contract BidWall is AccessControl, Ownable {
         });
 
         // Map our pending fees to our response
-        pendingEth_ = _poolInfo.pendingETHFees;
+        pendingEth_ = _poolInfo.pendingUSDCFees;
     }
 
     /**
@@ -470,7 +498,9 @@ contract BidWall is AccessControl, Ownable {
      *
      * @param swapFeeThreshold The new threshold to set
      */
-    function setSwapFeeThreshold(uint swapFeeThreshold) external onlyOwner {
+    function setSwapFeeThreshold(
+        uint swapFeeThreshold
+    ) external onlyOwner {
         _swapFeeThreshold = swapFeeThreshold;
         emit FixedSwapFeeThresholdUpdated(_swapFeeThreshold);
     }
@@ -480,7 +510,9 @@ contract BidWall is AccessControl, Ownable {
      *
      * @param _staleTimeWindow The new stale time window to set
      */
-    function setStaleTimeWindow(uint _staleTimeWindow) external onlyOwner {
+    function setStaleTimeWindow(
+        uint _staleTimeWindow
+    ) external onlyOwner {
         staleTimeWindow = _staleTimeWindow;
         emit StaleTimeWindowUpdated(_staleTimeWindow);
     }
@@ -492,11 +524,16 @@ contract BidWall is AccessControl, Ownable {
      * @param _key The {PoolKey} that is being modified
      * @param _nativeIsZero If our native token is `currency0`
      * @param _currentTick The current tick for the pool
-     * @param _ethAmount The amount of native token we are adding to the BidWall
+     * @param _usdcAmount The amount of native token we are adding to the BidWall
      */
-    function _addETHLiquidity(PoolKey memory _key, bool _nativeIsZero, int24 _currentTick, uint _ethAmount) internal {
-        // If we have no ETH to process, then we cannot create a position
-        if (_ethAmount == 0) {
+    function _addUSDCLiquidity(
+        PoolKey memory _key,
+        bool _nativeIsZero,
+        int24 _currentTick,
+        uint _usdcAmount
+    ) internal {
+        // If we have no USDC to process, then we cannot create a position
+        if (_usdcAmount == 0) {
             return;
         }
 
@@ -521,7 +558,7 @@ contract BidWall is AccessControl, Ownable {
             liquidityDelta = LiquidityAmounts.getLiquidityForAmount0({
                 sqrtPriceAX96: TickMath.getSqrtPriceAtTick(newTickLower),
                 sqrtPriceBX96: TickMath.getSqrtPriceAtTick(newTickUpper),
-                amount0: _ethAmount
+                amount0: _usdcAmount
             });
         } else {
             newTickUpper = baseTick.validTick(true);
@@ -529,7 +566,7 @@ contract BidWall is AccessControl, Ownable {
             liquidityDelta = LiquidityAmounts.getLiquidityForAmount1({
                 sqrtPriceAX96: TickMath.getSqrtPriceAtTick(newTickLower),
                 sqrtPriceBX96: TickMath.getSqrtPriceAtTick(newTickUpper),
-                amount1: _ethAmount
+                amount1: _usdcAmount
             });
         }
 
@@ -556,7 +593,7 @@ contract BidWall is AccessControl, Ownable {
      * @param _tickLower The lower tick of our BidWall position
      * @param _tickUpper The upper tick of our BidWall position
      *
-     * @return ethWithdrawn_ The amount of native token withdrawn
+     * @return usdcWithdrawn_ The amount of native token withdrawn
      * @return memecoinWithdrawn_ The amount of Memecoin withdrawn
      */
     function _removeLiquidity(
@@ -564,17 +601,10 @@ contract BidWall is AccessControl, Ownable {
         bool _nativeIsZero,
         int24 _tickLower,
         int24 _tickUpper
-    ) internal returns (
-        uint ethWithdrawn_,
-        uint memecoinWithdrawn_
-    ) {
+    ) internal returns (uint usdcWithdrawn_, uint memecoinWithdrawn_) {
         // Get our existing liquidity for the position
         (uint128 liquidityBefore,,) = poolManager.getPositionInfo({
-            poolId: _key.toId(),
-            owner: address(this),
-            tickLower: _tickLower,
-            tickUpper: _tickUpper,
-            salt: 'bidwall'
+            poolId: _key.toId(), owner: address(this), tickLower: _tickLower, tickUpper: _tickUpper, salt: "bidwall"
         });
 
         BalanceDelta delta = _modifyAndSettleLiquidity({
@@ -585,8 +615,8 @@ contract BidWall is AccessControl, Ownable {
             _sender: address(this)
         });
 
-        // Set our ETH and Memecoin withdrawn amounts, depending on if the native token is currency0
-        (ethWithdrawn_, memecoinWithdrawn_) = _nativeIsZero
+        // Set our USDC and Memecoin withdrawn amounts, depending on if the native token is currency0
+        (usdcWithdrawn_, memecoinWithdrawn_) = _nativeIsZero
             ? (uint128(delta.amount0()), uint128(delta.amount1()))
             : (uint128(delta.amount1()), uint128(delta.amount0()));
     }
@@ -608,18 +638,13 @@ contract BidWall is AccessControl, Ownable {
         int24 _tickUpper,
         int128 _liquidityDelta,
         address _sender
-    ) internal returns (
-        BalanceDelta delta_
-    ) {
-        (delta_, ) = poolManager.modifyLiquidity({
+    ) internal returns (BalanceDelta delta_) {
+        (delta_,) = poolManager.modifyLiquidity({
             key: _poolKey,
             params: IPoolManager.ModifyLiquidityParams({
-                tickLower: _tickLower,
-                tickUpper: _tickUpper,
-                liquidityDelta: _liquidityDelta,
-                salt: 'bidwall'
+                tickLower: _tickLower, tickUpper: _tickUpper, liquidityDelta: _liquidityDelta, salt: "bidwall"
             }),
-            hookData: ''
+            hookData: ""
         });
 
         if (delta_.amount0() < 0) {
@@ -644,7 +669,9 @@ contract BidWall is AccessControl, Ownable {
      *
      * @return uint The swap fee threshold
      */
-    function _getSwapFeeThreshold(uint) internal virtual view returns (uint) {
+    function _getSwapFeeThreshold(
+        uint
+    ) internal view virtual returns (uint) {
         return _swapFeeThreshold;
     }
 
@@ -653,16 +680,17 @@ contract BidWall is AccessControl, Ownable {
      *
      * @return bool Set to `true` to prevent owner being reinitialized.
      */
-    function _guardInitializeOwner() internal pure override virtual returns (bool) {
+    function _guardInitializeOwner() internal pure virtual override returns (bool) {
         return true;
     }
 
     /**
      * Ensures that only a {PositionManager} can call the function.
      */
-    modifier onlyPositionManager {
-        if (!hasRole(ProtocolRoles.POSITION_MANAGER, msg.sender)) revert NotPositionManager();
+    modifier onlyPositionManager() {
+        if (!hasRole(ProtocolRoles.POSITION_MANAGER, msg.sender)) {
+            revert NotPositionManager();
+        }
         _;
     }
-
 }

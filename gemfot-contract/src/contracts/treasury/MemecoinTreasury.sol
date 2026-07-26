@@ -35,8 +35,8 @@ contract MemecoinTreasury is Initializable, ReentrancyGuard {
     /// The {TreasuryActionManager} contract that stores approved actions
     TreasuryActionManager public actionManager;
 
-    /// The {PositionManager} that fees will be claimed from
-    PositionManager public positionManager;
+    /// The {GemFotManager} that fees will be claimed from
+    GemFotManager public gemfotManager;
 
     /// The `PoolKey` that is attached to this {MemecoinTreasury}
     PoolKey public poolKey;
@@ -49,7 +49,7 @@ contract MemecoinTreasury is Initializable, ReentrancyGuard {
      * @param _poolKey The pool that is being actioned against
      */
     function initialize(
-        address payable _positionManager,
+        address payable _gemfotManager,
         address _actionManager,
         address _nativeToken,
         PoolKey memory _poolKey
@@ -57,7 +57,7 @@ contract MemecoinTreasury is Initializable, ReentrancyGuard {
         actionManager = TreasuryActionManager(_actionManager);
         nativeToken = _nativeToken;
         poolKey = _poolKey;
-        positionManager = PositionManager(_positionManager);
+        gemfotManager = GemFotManager(_gemfotManager);
     }
 
     /**
@@ -108,7 +108,7 @@ contract MemecoinTreasury is Initializable, ReentrancyGuard {
      * @dev This call does not require protection and can be called by anyone
      */
     function claimFees() public {
-        positionManager.feeEscrow().withdrawFees(address(this), false);
+        gemfotManager.feeEscrow().withdrawFees(address(this), false);
     }
 
     receive() external payable {}

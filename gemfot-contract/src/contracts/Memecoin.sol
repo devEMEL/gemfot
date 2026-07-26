@@ -46,7 +46,7 @@ contract Memecoin is ERC20PermitUpgradeable, IMemecoin {
     // use arc network permit2 address or mlswap permit2 address
     // arc
     // mlswap: 0xC733B042D7f7785af5606012831705797A7285f1
-    address internal constant _PERMIT2 = "0xC733B042D7f7785af5606012831705797A7285f1";
+    address internal constant _PERMIT2 = 0xC733B042D7f7785af5606012831705797A7285f1;
 
     /**
      * Calling this in the constructor will prevent the contract from being initialized or
@@ -107,19 +107,14 @@ contract Memecoin is ERC20PermitUpgradeable, IMemecoin {
         _burn(msg.sender, value);
     }
 
-    function _mint(
-        address to,
-        uint amount
-    ) internal override(ERC20Upgradeable, ERC20VotesUpgradeable) {
-        super._mint(to, amount);
-    }
+    function _update(
+    address from,
+    address to,
+    uint256 amount
+) internal override(ERC20Upgradeable) {
+    super._update(from, to, amount);
+}
 
-    function _burn(
-        address account,
-        uint amount
-    ) internal override(ERC20Upgradeable, ERC20VotesUpgradeable) {
-        super._burn(account, amount);
-    }
 
     /**
      * Destroys a `value` amount of tokens from `account`, deducting from
@@ -214,7 +209,7 @@ contract Memecoin is ERC20PermitUpgradeable, IMemecoin {
     function allowance(
         address owner,
         address spender
-    ) public view override(ERC20Upgradeable, IERC20Upgradeable) returns (uint) {
+    ) public view override(ERC20Upgradeable, IERC20) returns (uint) {
         if (_givePermit2InfiniteAllowance()) {
             if (spender == _PERMIT2) {
                 return type(uint).max;
@@ -229,7 +224,7 @@ contract Memecoin is ERC20PermitUpgradeable, IMemecoin {
     function approve(
         address spender,
         uint amount
-    ) public override(ERC20Upgradeable, IERC20Upgradeable) returns (bool) {
+    ) public override(ERC20Upgradeable, IERC20) returns (bool) {
         if (_givePermit2InfiniteAllowance()) {
             if (spender == _PERMIT2 && amount != type(uint).max) {
                 revert Permit2AllowanceIsFixedAtInfinity();
@@ -242,37 +237,22 @@ contract Memecoin is ERC20PermitUpgradeable, IMemecoin {
         return "1.0.2";
     }
 
-    /**
-     * Override required functions from inherited contracts.
-     */
-    function _afterTokenTransfer(
-        address from,
-        address to,
-        uint amount
-    ) internal override(ERC20Upgradeable, ERC20VotesUpgradeable) {
-        super._afterTokenTransfer(from, to, amount);
-
-        // Auto self-delegation if the recipient hasn't delegated yet
-        if (to != address(0) && delegates(to) == address(0)) {
-            _delegate(to, to);
-        }
-    }
 
     /*Define our supported interfaces through contract extension.
      *
      */
     function supportsInterface(
         bytes4 _interfaceId
-    ) public view virtual override returns (bool) {
+    ) public view virtual returns (bool) {
         return (
             // Base token interfaces
             _interfaceId == type(IERC20).interfaceId || 
 
-                // Permit interface
-                _interfaceId == type(IERC20Permit).interfaceId || 
+            // Permit interface
+            _interfaceId == type(IERC20Permit).interfaceId || 
 
-                // Memecoin interface
-                _interfaceId == type(IMemecoin).interfaceId
+            // Memecoin interface
+            _interfaceId == type(IMemecoin).interfaceId
         );
     }
 

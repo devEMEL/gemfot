@@ -1,0 +1,101 @@
+
+
+Here is the breakdown of the calculations and numbers based on the creator's parameters:
+
+---
+
+### 1. Supply and Burning Numbers (10B vs. 100B launch)
+Because the initial total mint supply of `100 Billion` (`100e27` base units, assuming 18 decimals) is a hardcoded constant in the smart contracts, **100 Billion tokens are always minted at launch.** 
+
+If the creator specifies `initialTokenFairLaunch = 10 Billion`, the numbers behave as follows:
+* **Fair Launch Allocation:** **10 Billion tokens** are placed in the Fair Launch pool.
+* **Locked Supply:** The remaining **90 Billion tokens** sit in the `PositionManager` contract.
+* **During the Fair Launch:** Users buy tokens out of the 10 Billion pool. Let's say users buy a total of **$X$ Billion tokens**.
+* **At Fair Launch Closure:**
+  * **Burned Amount:** Any unsold tokens from the Fair Launch pool (**`10 Billion - X`**) are transferred to the dead address (`0x0000...dEaD`) and permanently destroyed.
+  * **Post-Launch Liquidity:** The **90 Billion tokens** (which were not part of the Fair Launch) are deposited into a Uniswap V4 single-sided sell-liquidity position starting just above the final Fair Launch price.
+  * **Bid Wall:** The USDC raised from the sold tokens ($X$) is deposited into a single-sided buy-liquidity position below the final price to act as a floor.
+
+---
+
+### 2. Fee Split Waterfall Calculation (50% Creator Fee)
+When a swap occurs, fees are split using a **waterfall model** defined in `FeeDistributor.sol`. Let's assume a trade generates **$100$ USDC of total swap fees** (with no referral fees for simplicity):
+
+$$\text{Total Fee} = 100 \text{ USDC}$$
+
+1. **Protocol Share:** Deducted first. If the protocol fee is set to $10\%$ (the maximum `MAX_PROTOCOL_ALLOCATION`):
+   * **Protocol Receives:** $10$ USDC.
+   * **Remaining Fee Pool:** $90$ USDC.
+2. **Creator Share:** Calculated as a percentage of the *remaining* fee pool.
+   * If the creator sets `creatorFeeAllocation = 50_00` ($50.00\%$):
+     * **Creator Receives:** $90 \times 50\% =$ **$45$ USDC**.
+     * **Remaining Fee Pool:** $45$ USDC.
+3. **BidWall (Treasury) Share:** Receives all remaining fees:
+   * **BidWall Receives:** **$45$ USDC**.
+
+> [!NOTE]
+> Because of the waterfall structure, setting the creator fee allocation to $50.00\%$ actually nets the creator $45\%$ of the **total** fee pool (if a $10\%$ protocol fee is active). If the creator wants to receive exactly $50\%$ of the **total** fee pool under a $10\%$ protocol fee, they must set `creatorFeeAllocation` to **$55\_56$** ($55.56\%$), because $90 \times 55.56\% \approx 50$ USDC.
+
+---
+
+### 3. Uniswap V4 Pricing Math (1:2 USDC/HNY Price)
+Assuming **USDC has 6 decimals** and **HNY (memecoin) has 18 decimals**:
+
+#### Interpretation A: 1 USDC = 2 HNY (so 1 HNY = 0.50 USDC / $0.50)
+* **Implied FDV (on 100B supply):** $50$ Billion USDC.
+* **Launch Param (`usdcMarketCap`):** Set to `50_000_000_000 * 10^6` (since USDC has 6 decimals).
+* **Implied Fair Launch value (on 10B supply):** $5$ Billion USDC.
+* **Uniswap V4 `sqrtPriceX96`:**
+  * **If USDC is token0:** Price ratio $= 2 \times 10^{12} \implies \text{sqrtPriceX96} \approx \mathbf{1.1204 \times 10^{35}}$
+  * **If HNY is token0:** Price ratio $= 0.5 \times 10^{-12} \implies \text{sqrtPriceX96} \approx \mathbf{5.6022 \times 10^{22}}$
+
+#### Interpretation B: 1 HNY = 2 USDC (so 1 HNY = $2.00)
+* **Implied FDV (on 100B supply):** $200$ Billion USDC.
+* **Launch Param (`usdcMarketCap`):** Set to `200_000_000_000 * 10^6`.
+* **Implied Fair Launch value (on 10B supply):** $20$ Billion USDC.
+* **Uniswap V4 `sqrtPriceX96`:**
+  * **If USDC is token0:** Price ratio $= 0.5 \times 10^{12} \implies \text{sqrtPriceX96} \approx \mathbf{5.6022 \times 10^{34}}$
+  * **If HNY is token0:** Price ratio $= 2 \times 10^{-12} \implies \text{sqrtPriceX96} \approx \mathbf{1.1204 \times 10^{23}}$
+
+---
+
+### 4. The Fee Calculator Parameter (`feeCalculatorParams`)
+The `feeCalculatorParams` is a raw `bytes` field passed into the active `IFeeCalculator` contract for the pool:
+* **StaticFeeCalculator:** Doesn't require configuration (pass empty bytes `0x`).
+* **HypeFeeCalculator (Anti-sniping protection):** Decodes a single `uint256` representing `targetTokensPerSec`. 
+  * If bots buy tokens too quickly during the Fair Launch (exceeding this target tokens-per-second rate), the calculator dynamically scales the swap fee up (from the base fee up to a maximum of $50\%$) to penalize snipers and make sniping unprofitable.
+
+
+
+
+
+
+so token creator has to manually calculate their usdcMarketCapValue
+
+Viewed InitialPrice.sol:57-94
+
+Yes, but the calculation they have to do is very simple. 
+
+Instead of doing complex math (like converting to ETH, fetching Uniswap prices, or calculating `sqrtPriceX96`), the token creator only has to calculate the **implied Fully Diluted Valuation (FDV)** of their token based on their desired launching price.
+
+The formula the creator uses to calculate the `usdcMarketCapValue` is:
+
+$$\text{usdcMarketCapValue} = \text{Desired Starting Price per Token (in USDC)} \times 100,000,000,000 \text{ (INITIAL\_SUPPLY)}$$
+
+---
+
+### Example
+If a creator wants HNY to launch at a price of **$0.50 USDC** per token:
+
+$$\text{usdcMarketCapValue} = 0.50 \text{ USDC} \times 100,000,000,000 = 50,000,000,000 \text{ USDC}$$
+
+To pass this into the contract (scaled to USDC's 6 decimals):
+$$\text{Value to Encode} = 50,000,000,000 \times 10^6 = \mathbf{50,000,000,000,000,000}$$
+
+---
+
+### What the Smart Contract Automatically Handles
+Once the creator provides that single number, the contract (`MarketCappedPrice.sol` or `MarketCappedPriceV3.sol`) automatically does the heavy lifting:
+1. It queries the live Uniswap pool to get the current price of ETH/Native currency in USDC.
+2. It converts the creator's target USDC Market Cap into an ETH/Native token equivalent.
+3. It converts that ETH equivalent and the 100 Billion token supply into the correct Uniswap V4 `sqrtPriceX96` initialization value.

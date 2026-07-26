@@ -1,10 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {SafeTransferLib} from "@solady/utils/SafeTransferLib.sol";
-
+import {IInitialPrice} from "@gemfot-interfaces/IInitialPrice.sol";
+import {ILaunch} from "@gemfot-interfaces/ILaunch.sol";
+import {IMemecoin} from "@gemfot-interfaces/IMemecoin.sol";
+import {BidWall} from "@gemfot/bidwall/BidWall.sol";
+import {FairLaunch} from "@gemfot/hooks/FairLaunch.sol";
+import {FeeDistributor} from "@gemfot/hooks/FeeDistributor.sol";
+import {FeeExemptions} from "@gemfot/hooks/FeeExemptions.sol";
+import {InternalSwapPool} from "@gemfot/hooks/InternalSwapPool.sol";
+import {Notifier} from "@gemfot/hooks/Notifier.sol";
+import {CurrencySettler} from "@gemfot/libraries/CurrencySettler.sol";
+import {UniswapHookEvents} from "@gemfot/libraries/UniswapHookEvents.sol";
+import {TreasuryActionManager} from "@gemfot/treasury/ActionManager.sol";
+import {MemecoinTreasury} from "@gemfot/treasury/MemecoinTreasury.sol";
+import {MemecoinFinder} from "@gemfot/types/MemecoinFinder.sol";
+import {StoreKeys} from "@gemfot/types/StoreKeys.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
+import {SafeTransferLib} from "@solady/utils/SafeTransferLib.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {Hooks, IHooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {SafeCast} from "@uniswap/v4-core/src/libraries/SafeCast.sol";
@@ -18,18 +31,9 @@ import {
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {BaseHook} from "@uniswap/v4-periphery/base/hooks/BaseHook.sol";
 
-import {BaseHook} from "v4-hooks-public/lib/v4-periphery/src/utils/BaseHook.sol";
-
-import {CurrencySettler} from "@gemfot/libraries/CurrencySettler.sol";
-import {MemecoinFinder} from "@gemfot/types/MemecoinFinder.sol";
-
-import {Notifier} from "@gemfot/hooks/Notifier.sol";
-import {StoreKeys} from "@gemfot/types/StoreKeys.sol";
-
-import {IInitialPrice} from "@gemfot-interfaces/IInitialPrice.sol";
-import {ILaunch} from "@gemfot-interfaces/ILaunch.sol";
-import {IMemecoin} from "@gemfot-interfaces/IMemecoin.sol";
+import {IFeeCalculator} from "@gemfot-interfaces/IFeeCalculator.sol";
 
 /**
  * The PositionManager is a Uniswap V4 hook that controls the user journey from token creation,
@@ -44,6 +48,98 @@ import {IMemecoin} from "@gemfot-interfaces/IMemecoin.sol";
  */
 
 contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys {
+    using BeforeSwapDeltaLibrary for BeforeSwapDelta;
+    using CurrencySettler for Currency;
+    using PoolIdLibrary for PoolKey;
+    using SafeCast for uint;
+    using StateLibrary for IPoolManager;
+    using MemecoinFinder for PoolKey;
+
+    error CallerIsNotBidWall();
+    error CannotBeInitializedDirectly();
+    error InsufficientLaunchFee(uint _paid, uint _required);
+    error TokenNotLaunched(uint _launchesAt);
+    error UnknownPool(PoolId _poolId);
+
+    /// Emitted when a Flaunch pool is created
+    event PoolCreated(
+        PoolId indexed _poolId,
+        address _memecoin,
+        address _memecoinTreasury,
+        uint _tokenId,
+        bool _currencyFlipped,
+        uint _launchFee,
+        LaunchParams _params
+    );
+
+    /// Emitted when a Flaunch pool is scheduled
+    event PoolScheduled(PoolId indexed _poolId, uint _flaunchesAt);
+
+    /// Emitted when a pool swap occurs
+    event PoolSwap(
+        PoolId indexed poolId,
+        int flAmount0,
+        int flAmount1,
+        int flFee0,
+        int flFee1,
+        int ispAmount0,
+        int ispAmount1,
+        int ispFee0,
+        int ispFee1,
+        int uniAmount0,
+        int uniAmount1,
+        int uniFee0,
+        int uniFee1
+    );
+
+    /// Emitted after any transaction to share pool state
+    event PoolStateUpdated(
+        PoolId indexed _poolId,
+        uint160 _sqrtPriceX96,
+        int24 _tick,
+        uint24 _protocolFee,
+        uint24 _swapFee,
+        uint128 _liquidity
+    );
+
+    /// Emitted when a user successfully premines their token
+    event PoolPremine(PoolId indexed _poolId, int _premineAmount);
+
+    /// Emitted when the `IInitialPrice` contract has been updated
+    event InitialPriceUpdated(address _initialPrice);
+
+    /// Emitted when the `FairLaunch` contract has burned unsold fair launch supply
+    event FairLaunchBurn(PoolId indexed _poolId, uint _unsoldSupply);
+
+    /**
+     * Defines our constructor parameters.
+     *
+     * @member nativeToken The native ETH equivalent token used by protocol
+     * @member poolManager The Uniswap V4 {PoolManager} contract
+     * @member feeDistribution The default fee distribution configuration
+     * @member initialPrice Set initial price calculator address
+     * @member protocolOwner The EOA that will be the initial owner
+     * @member protocolFeeRecipient The recipient EOA of all
+     * @member feeEscrow The {FeeEscrow} contract to be used by the PositionManager
+     * @member feeExemptions The default global FeeExemption values
+     * @member actionManager The {TreasuryActionManager} contract
+     * @member bidWall The {BidWall} contract to be used by the PositionManager
+     * @member fairLaunch The {FairLaunch} contract to be used by the PositionManager
+     */
+    struct ConstructorParams {
+        address nativeToken;
+        IPoolManager poolManager;
+        FeeDistribution feeDistribution;
+        IInitialPrice initialPrice;
+        address protocolOwner;
+        address protocolFeeRecipient;
+        address feeEscrow;
+        FeeExemptions feeExemptions;
+        TreasuryActionManager actionManager;
+        BidWall bidWall;
+        FairLaunch fairLaunch;
+    }
+
     /**
      * Parameters required when launching a new token.
      *
@@ -51,7 +147,7 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
      * @member symbol Symbol of the token
      * @member tokenUri The generated ERC721 token URI
      * @member initialTokenFairLaunch The amount of tokens to add as single sided fair launch liquidity
-     * @member fairLaunchDuration The duration of the fair launch period
+     * @member fairLaunchDuration The duration of the fair launch period (in seconds - YEAH YEAH)
      * @member premineAmount The amount of tokens that the creator will buy themselves
      * @member creator The address that will receive the ERC721 ownership and premined ERC20 tokens
      * @member creatorFeeAllocation The percentage of fees the creators wants to take from the BidWall
@@ -72,4 +168,327 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
         bytes initialPriceParams;
         bytes feeCalculatorParams;
     }
+
+    /// The minimum amount before a distribution is triggered
+    uint public constant MIN_DISTRIBUTE_THRESHOLD = 100 * 10 ** 6; // USDC
+
+    /// The `dEaD` address to burn our unsold memecoins to
+    address public constant BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
+
+    /// The contract that will be used for launching tokens
+    ILaunch public launchContract;
+
+    /// Our starting token sqrtPriceX96
+    IInitialPrice public initialPrice;
+
+    /// Internal storage to allow the `beforeSwap` tick value to be used in `afterSwap`
+    int24 internal _beforeSwapTick;
+
+    /// Store the address that will collect protocol fees
+    address internal protocolFeeRecipient;
+
+    /// Store the contract that will manage our Bidwall interactions
+    BidWall public bidWall;
+
+    /// The contract that handles the FairLaunch flow
+    FairLaunch public fairLaunch;
+
+    /// The contract that handles the token Treasury actions
+    TreasuryActionManager public actionManager;
+
+    /// Store the contract that will manage fee exemptions
+    FeeExemptions public feeExemptions;
+
+    /// Store our {Notifier} contract
+    Notifier public notifier;
+
+    /// Store the block timestamp when a poolId is set to launch
+    mapping(PoolId _poolId => uint _launchTime) public launchesAt;
+
+    /**
+     * Initializes our {BaseHook} contract and initializes all implemented hooks.
+     */
+    constructor(
+        ConstructorParams memory params
+    )
+        BaseHook(params.poolManager)
+        FeeDistributor(params.nativeToken, params.feeDistribution, params.protocolOwner, params.feeEscrow)
+    {
+        // Set our contract references
+        initialPrice = params.initialPrice;
+
+        // Set our protocol fee recipient
+        protocolFeeRecipient = params.protocolFeeRecipient;
+
+        // Register our FeeExemption contract
+        feeExemptions = params.feeExemptions;
+
+        // Register our BidWall contract
+        bidWall = params.bidWall;
+
+        // Register our FairLaunch logic
+        fairLaunch = params.fairLaunch;
+
+        // Register our ActionManager
+        actionManager = params.actionManager;
+
+        // Deploy our notifier
+        notifier = new Notifier(params.protocolOwner);
+
+        // Approve the BidWall to manage native token from the PositionManager
+        IERC20(params.nativeToken).approve(address(bidWall), type(uint).max);
+        IERC20(params.nativeToken).approve(address(fairLaunch), type(uint).max);
+    }
+
+    /**
+     * Creates a new ERC20 memecoin token creating and an ERC721 that signifies ownership of the
+     * launched collection. The token is then initialized into a UV4 pool.
+     *
+     * The FairLaunch period will start in this call, as soon as the pool is initialized.
+     *
+     * @return memecoin_ The created ERC20 token address
+     */
+    function launch(
+        LaunchParams calldata _params
+    ) external payable returns (address memecoin_) {
+        uint tokenId;
+        address payable memecoinTreasury;
+
+        // Launch our token
+        (memecoin_, memecoinTreasury, tokenId) = launchContract.launch(_params);
+
+        // Check if our pool currency is flipped
+        bool currencyFlipped = nativeToken >= memecoin_;
+
+        // Create our Uniswap pool and store the pool key for lookups
+        PoolKey memory _poolKey = PoolKey({
+            currency0: Currency.wrap(!currencyFlipped ? nativeToken : memecoin_),
+            currency1: Currency.wrap(currencyFlipped ? nativeToken : memecoin_),
+            fee: 0,
+            tickSpacing: 60,
+            hooks: IHooks(address(this))
+        });
+
+        // Initialize the {MemecoinTreasury} with `PoolKey`
+        MemecoinTreasury(memecoinTreasury)
+            .initialize(payable(address(this)), address(actionManager), nativeToken, _poolKey);
+
+        // Set the PoolKey to storage
+        _poolKeys[memecoin_] = _poolKey;
+        PoolId poolId = _poolKey.toId();
+
+        // If we have a non-zero creator fee allocation, then we need to update our creator's
+        // fee allocation.
+        if (_params.creatorFeeAllocation != 0) {
+            creatorFee[poolId] = _params.creatorFeeAllocation;
+        }
+
+        // Initialize all fee calculators attached to the pool, along with any custom parameters
+        _initializeFeeCalculators(poolId, _params.feeCalculatorParams);
+
+        // Initialize our memecoin with the sqrtPriceX96
+        int24 initialTick = poolManager.initialize(
+            _poolKey, initialPrice.getSqrtPriceX96(msg.sender, currencyFlipped, _params.initialPriceParams)
+        );
+
+        // Check if we have an initial launching fee, check that enough ETH has been sent
+        uint launchFee = getLaunchingFee(_params.initialPriceParams);
+
+        emit PoolCreated({
+            _poolId: poolId,
+            _memecoin: memecoin_,
+            _memecoinTreasury: memecoinTreasury,
+            _tokenId: tokenId,
+            _currencyFlipped: currencyFlipped,
+            _launchFee: launchFee,
+            _params: _params
+        });
+
+        /**
+         * [PREMINE] If the creator has requested tokens from their initial fair launch
+         * allocation, which they can purchase in the same transaction.
+         */
+
+        if (_params.premineAmount != 0) {
+            int premineAmount = _params.premineAmount.toInt256();
+            assembly { tstore(poolId, premineAmount) }
+        }
+
+        /**
+         * [FL] At token creation, x% of token supply is put into a one-sided position.
+         */
+
+        // We don't currently require any token approval to create a fair launch position, but
+        // when the position closes, the {FairLaunch} contract will supply the {PoolManager}
+        // with tokens from this contract.
+        IMemecoin(memecoin_).approve(address(fairLaunch), type(uint).max);
+
+        // Regardless of having a fair launch, we need to call `createPosition` as this
+        // instantiates our storage struct that is required for when the position is closed
+        // and the tokens are moved to a Uniswap V4 liquidity position.
+        fairLaunch.createPosition({
+            _poolId: poolId,
+            _initialTick: initialTick,
+            _launchesAt: _params.launchAt > block.timestamp ? _params.launchAt : block.timestamp,
+            _initialTokenFairLaunch: _params.initialTokenFairLaunch,
+            _fairLaunchDuration: _params.fairLaunchDuration
+        });
+
+        /**
+         * [SCHEDULE] If we have a timestamp in the future, then we set our schedule mapping.
+         */
+
+        if (_params.launchAt > block.timestamp) {
+            launchesAt[poolId] = _params.launchAt;
+            emit PoolScheduled(poolId, _params.launchAt);
+        } else {
+            // If the `launchAt` timestamp has already passed, then use the current timestamp
+            launchesAt[poolId] = block.timestamp;
+        }
+
+        // rewrite since we are taking USDC instead of ETH
+        if (launchFee != 0) {
+            uint allowance = IERC20(nativeToken).allowance(msg.sender, address(this));
+            if (allowance < launchFee) {
+                revert InsufficientLaunchFee(allowance, launchFee);
+            }
+
+            // Pay the launching fee to our fee recipient
+            SafeTransferLib.safeTransferFrom(nativeToken, msg.sender, protocolFeeRecipient, launchFee);
+        }
+
+        // After our contract is initialized, we mark our pool as initialized and emit
+        // our state update to notify the UX of current prices, etc. This will include
+        // optional liquidity modifications from the Fair Launch logic.
+        _emitPoolStateUpdate(poolId, IHooks.afterInitialize.selector, abi.encode(tokenId, _params));
+    }
+
+
+
+    /**
+     * Returns the PoolKey mapped to the token address. If none is set then a zero value
+     * will be returned for the fields.
+     *
+     * @dev The easiest way to check for an empty response is `tickSpacing = 0`
+     *
+     * @param _token The address of the ERC20 token
+     *
+     * @return The corresponding {PoolKey} for the token
+     */
+    function poolKey(address _token) external view returns (PoolKey memory) {
+        return _poolKeys[_token];
+    }
+
+
+
+
+    /**
+     * Gets the USDC fee that must be paid to launch a token.
+     *
+     * @return The USDC value of the fee
+     */
+    function getLaunchingFee(
+        bytes calldata _initialPriceParams
+    ) public view returns (uint) {
+        return initialPrice.getLaunchingFee(msg.sender, _initialPriceParams);
+    }
+
+
+        /**
+     * Emits an event that provides pool state updates and passes the data to subscribers.
+     *
+     * @param _poolId The PoolId that has been updated
+     * @param _key The selector being sent to notification subscribers
+     * @param _data The data being sent to notification subscribers
+     */
+    function _emitPoolStateUpdate(PoolId _poolId, bytes4 _key, bytes memory _data) internal {
+        // Notify our subscribed contracts
+        notifier.notifySubscribers(_poolId, _key, _data);
+
+        // Emit our event
+        (uint160 sqrtPriceX96, int24 tick, uint24 protocolFee, uint24 swapFee) = poolManager.getSlot0(_poolId);
+        emit PoolStateUpdated(_poolId, sqrtPriceX96, tick, protocolFee, swapFee, poolManager.getLiquidity(_poolId));
+    }
+
+
+    /**
+     * Defines the Uniswap V4 hooks that are used by our implementation. This will determine
+     * the address that our contract **must** be deployed to for Uniswap V4. This address suffix
+     * is shown in the dev comments for this function call.
+     *
+     * @dev 1011 1111 0111 00 == 2FDC
+     */
+    function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
+        return Hooks.Permissions({
+            beforeInitialize: true, // Prevent initialize
+            afterInitialize: false,
+            beforeAddLiquidity: true, // [FairLaunch], [InternalSwapPool]
+            afterAddLiquidity: true, // [EventTracking]
+            beforeRemoveLiquidity: true, // FairLaunch], [InternalSwapPool]
+            afterRemoveLiquidity: true, // [EventTracking]
+            beforeSwap: true, // FairLaunch], [InternalSwapPool]
+            afterSwap: true, // [FeeDistributor], [InternalSwapPool], [BidWall], [EventTracking]
+            beforeDonate: false,
+            afterDonate: true, // [EventTracking]
+            beforeSwapReturnDelta: true, // [InternalSwapPool]
+            afterSwapReturnDelta: true, // [FeeDistributor]
+            afterAddLiquidityReturnDelta: false,
+            afterRemoveLiquidityReturnDelta: false
+        });
+    }
+
+    /**
+     * The hook called before the state of a pool is initialized. Prevents external contracts
+     * from initializing pools using our contract as a hook.
+     *
+     * @dev As we call `poolManager.initialize` from the IHooks contract itself, we bypass this
+     * hook call as therefore bypass the prevention.
+     */
+    function beforeInitialize(address, PoolKey calldata, uint160) external view override onlyPoolManager returns (bytes4) {
+        revert CannotBeInitializedDirectly();
+    }
+
+    /**
+     * Updates the `IInitialPrice` contract address that is used during `flaunch` to calculate
+     * the initial tick / sqrtPriceX96 value.
+     *
+     * @param _initialPrice The contract address for the `IInitialPrice` contract
+     */
+    function setInitialPrice(address _initialPrice) public onlyOwner {
+        initialPrice = IInitialPrice(_initialPrice);
+        emit InitialPriceUpdated(_initialPrice);
+    }
+
+    /**
+     * Calls for the BidWall to be closed, as this requires callback from the {PoolManager}.
+     */
+    function closeBidWall(PoolKey memory _key) public {
+        // Ensure that the call is made by the BidWall which validates logic
+        if (msg.sender != address(bidWall)) revert CallerIsNotBidWall();
+
+        // Ensure that the PoolKey that is being closed is valid and recognised on the protocol,
+        // otherwise we could processing issues and false positives in upcoming steps. We need to
+        // ensure that the PoolKey is recognised (by checking the hooks address is not zero) and
+        // that the PoolId matches when encoded.
+        PoolKey memory storedKey = _poolKeys[address(_key.memecoin(nativeToken))];
+        if (storedKey.hooks == IHooks(address(0)) || PoolId.unwrap(storedKey.toId()) != PoolId.unwrap(_key.toId())) {
+            revert UnknownPool(_key.toId());
+        }
+
+        // Action our BidWall closure via the {PoolManager} unlock
+        poolManager.unlock(abi.encode(_key));
+    }
+
+    /**
+     * This function should only be called by the `closeBidWall` function to unlock the {PoolManager}
+     * interactions for the `{BidWall}.closeBidWall` function.
+     *
+     * @param _data The encoded {PoolKey} for the `closeBidWall` request
+     *
+     * @return bytes Empty data; nothing will be returned
+     */
+    function _unlockCallback(bytes calldata _data) internal override returns (bytes memory) {
+        bidWall.closeBidWall(abi.decode(_data, (PoolKey)));
+    }
+
 }

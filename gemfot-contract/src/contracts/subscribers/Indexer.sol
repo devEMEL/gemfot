@@ -48,10 +48,10 @@ contract IndexerSubscriber is Ownable {
     mapping(PoolId _poolId => Index _index) internal _poolIndex;
 
     /// Maps a PoolId to a Flaunch contract
-    mapping(PoolId _poolId => Flaunch _flaunch) internal _poolFlaunch;
+    mapping(PoolId _poolId => Launch _launch) internal _poolLaunch;
 
     /// Maps each notifier to the launch contract that it will represent
-    mapping(address _notifier => address _flaunch) internal _notifierFlaunch;
+    mapping(address _notifier => address _launch) internal _notifierLaunch;
 
     /**
      * Registers the owner of the contract.
@@ -94,12 +94,12 @@ contract IndexerSubscriber is Ownable {
 
         // If the notifier has not been allocated a launch contract, then we cannot
         // proceed with our indexing.
-        if (_notifierFlaunch[msg.sender] == address(0)) {
+        if (_notifierLaunch[msg.sender] == address(0)) {
             return;
         }
 
         // Register our launch contract relative to the notifier
-        Flaunch launch = Flaunch(_notifierFlaunch[msg.sender]);
+        Launch launch = Launch(_notifierLaunch[msg.sender]);
 
         // Unpack our tokenId from our passed initialization data
         (uint tokenId) = abi.decode(_data, (uint));
@@ -113,7 +113,7 @@ contract IndexerSubscriber is Ownable {
         });
 
         // Store our launch contract relative to the PoolId
-        _poolFlaunch[_poolId] = launch;
+        _poolLaunch[_poolId] = launch;
     }
 
     /**
@@ -138,7 +138,7 @@ contract IndexerSubscriber is Ownable {
         // the ownership of the token has been burned. If it has been burned and future contract calls
         // depend on this value, then they could receive a revert.
         if (poolIndex_.tokenId != 0) {
-            try _poolFlaunch[_poolId].ownerOf(poolIndex_.tokenId) returns (
+            try _poolLaunch[_poolId].ownerOf(poolIndex_.tokenId) returns (
                 address owner
             ) {
             // ..
@@ -163,7 +163,7 @@ contract IndexerSubscriber is Ownable {
     ) public {
         // Declare our global variables
         AddIndexParams memory params;
-        Flaunch launch;
+        Launch launch;
         PoolId poolId;
         uint tokenId;
 
@@ -171,7 +171,7 @@ contract IndexerSubscriber is Ownable {
         uint paramsLength = _params.length;
         for (uint i; i < paramsLength; ++i) {
             params = _params[i];
-            launch = Flaunch(params.launch);
+            launch = Launch(params.launch);
 
             // Iterate over our tokenIds
             uint tokenIdsLength = params.tokenIds.length;
@@ -192,7 +192,7 @@ contract IndexerSubscriber is Ownable {
                 }
 
                 // Find the PoolKey by the memecoin address
-                poolId = launch.positionManager().poolKey(memecoin).toId();
+                poolId = launch.gemfotManager().poolKey(memecoin).toId();
 
                 // Store our validated index data
                 _poolIndex[poolId] = Index({
@@ -203,7 +203,7 @@ contract IndexerSubscriber is Ownable {
                 });
 
                 // Store our launch contract relative to the PoolId
-                _poolFlaunch[poolId] = launch;
+                _poolLaunch[poolId] = launch;
             }
         }
     }
@@ -218,6 +218,6 @@ contract IndexerSubscriber is Ownable {
         address _notifier,
         address _flaunch
     ) public onlyOwner {
-        _notifierFlaunch[_notifier] = _flaunch;
+        _notifierLaunch[_notifier] = _flaunch;
     }
 }

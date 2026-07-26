@@ -35,8 +35,6 @@ interface IMemecoin is IERC20 {
 
     function tokenURI() external view returns (string memory);
 
-    function clock() external view returns (uint48);
-
     function creator() external view returns (address);
 
     function treasury() external view returns (address payable);

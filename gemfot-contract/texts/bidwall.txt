@@ -1,0 +1,169 @@
+
+Section BidWall
+
+
+---
+
+### Core Concept: What is the BidWall?
+The `BidWall` implements a dynamic **"Plunge Protection" (floor price support) mechanism** for launched memecoins. 
+When users swap tokens, a portion of the trading fees (in the native currency, e.g., ETH or USDC) is sent to this contract. Once these fees cross a set threshold, the `BidWall` deploys them into a single-sided buy position on Uniswap V4 placed **exactly 1 tick below the spot price**. 
+
+As the token price rises, the contract pulls the old liquidity and redeploys it 1 tick below the new spot price. If the price falls, this liquidity acts as a hard buy wall to support the price floor.
+
+---
+
+## 1. Structs and Configuration State
+
+### `PoolInfo` (Struct)
+Tracks the internal state of the BidWall for each token pool:
+* `disabled`: A boolean flag allowing the token creator to disable the BidWall.
+* `initialized`: Tracks whether this pool has had liquidity deployed.
+* `tickLower` & `tickUpper`: The active tick range of the Uniswap V4 buy position.
+* `pendingETHFees`: Accumulated fees waiting to cross the threshold before being deployed.
+* `cumulativeSwapFees`: Total lifetime swap fees received by this pool.
+
+### Key State Variables
+* `poolManager`: Reference to the Uniswap V4 `IPoolManager`.
+* `nativeToken`: The pool's base trading asset (e.g. `flETH` or `USDC`).
+* `_swapFeeThreshold`: The minimum amount of accumulated fees required to trigger a repositioning (default: `0.1 ether`).
+* `staleTimeWindow`: The maximum time (default: `7 days`) pending fees can sit idle before being deployed, even if the fee threshold has not been met.
+
+---
+
+## 2. Core Functions (State Management)
+
+### `deposit`
+```solidity
+function deposit(PoolKey memory _poolKey, uint _ethSwapAmount, int24 _currentTick, bool _nativeIsZero) public onlyPositionManager
+```
+* **Called by:** The `PositionManager` whenever swap fees are collected.
+* **What it does:** 
+  1. Increments `pendingETHFees` and `cumulativeSwapFees` for the pool.
+  2. Updates the `lastPoolTransaction` timestamp.
+  3. Checks if the `pendingETHFees` have crossed the threshold.
+  4. If the threshold is met, it triggers `_reposition()` to deploy the new fees.
+
+### `checkStalePosition`
+```solidity
+function checkStalePosition(PoolKey memory _poolKey, int24 _currentTick, bool _nativeIsZero) external onlyPositionManager
+```
+* **Called by:** The `PositionManager`'s hook callback (usually during a swap).
+* **What it does:** Prevents fee liquidity from sitting idle. If no transactions have occurred for longer than the `staleTimeWindow` (7 days) and there are pending fees, it forces a `_reposition()` immediately, bypassing the normal threshold checks.
+
+### `_reposition` (Internal)
+```solidity
+function _reposition(PoolKey memory _poolKey, PoolInfo storage _poolInfo, int24 _currentTick, bool _nativeIsZero) internal
+```
+* **What it does:** The main execution loop of the BidWall:
+  1. **Removes legacy liquidity:** If already initialized, it completely withdraws the active Uniswap V4 position (releasing both native tokens and any memecoins bought by the wall).
+  2. **Handles Tick Overshoot:** Compares the before-swap tick (`_currentTick`) to the real-time pool tick (`slot0Tick`). If a swap has moved the price against the wall, it adjusts the tick to avoid transaction failure.
+  3. **Deploys new liquidity:** Re-calculates and deploys a new position containing the withdrawn native tokens plus the newly accumulated pending fees.
+  4. **Cleans up reward tokens:** If the wall bought any memecoins (meaning users sold into the floor), it transfers those memecoins directly to the token's `MemecoinTreasury`.
+
+---
+
+## 3. Position and Liquidity Math (Internal Helpers)
+
+### `_addETHLiquidity` (Internal)
+```solidity
+function _addETHLiquidity(PoolKey memory _key, bool _nativeIsZero, int24 _currentTick, uint _ethAmount) internal
+```
+* **What it does:** 
+  1. Identifies the tick directly adjacent to the spot price (`_currentTick + 1` or `_currentTick - 1` depending on pool token order).
+  2. Calculates the exact `liquidityDelta` that the native token amount (`_ethAmount`) can purchase across a single-tick range using Uniswap's `LiquidityAmounts` library.
+  3. Deploys the position via `_modifyAndSettleLiquidity`.
+  4. Saves the new `tickLower` and `tickUpper` to the pool's state.
+
+### `_removeLiquidity` (Internal)
+```solidity
+function _removeLiquidity(PoolKey memory _key, bool _nativeIsZero, int24 _tickLower, int24 _tickUpper) internal returns (uint ethWithdrawn_, uint memecoinWithdrawn_)
+```
+* **What it does:** Queries the exact size of the active liquidity position, calls `_modifyAndSettleLiquidity` with a negative delta (`-liquidityBefore`) to burn the LP position, and returns the retrieved native tokens and memecoins.
+
+### `_modifyAndSettleLiquidity` (Internal)
+```solidity
+function _modifyAndSettleLiquidity(PoolKey memory _poolKey, int24 _tickLower, int24 _tickUpper, int128 _liquidityDelta, address _sender) internal returns (BalanceDelta delta_)
+```
+* **What it does:** Directly calls `poolManager.modifyLiquidity` to add/remove LP positions. It handles settling payment (if adding liquidity) or taking credit (if removing liquidity) to and from the pool manager.
+
+---
+
+## 4. Creator Control Functions
+
+### `setDisabledState`
+```solidity
+function setDisabledState(PoolKey memory _key, bool _disable) external
+```
+* **Who can call:** The creator of the memecoin.
+* **What it does:** Toggles the BidWall `disabled` state. If `_disable` is set to `true`, it immediately calls the `PositionManager` to close the active position, returning the funds to the treasury. Future swap fees will bypass the wall and route directly to the treasury.
+
+### `closeBidWall`
+```solidity
+function closeBidWall(PoolKey memory _key) external onlyPositionManager
+```
+* **Called by:** The `PositionManager` (after being triggered by `setDisabledState`).
+* **What it does:** Permanently winds down the BidWall. It removes all active liquidity, resets the pending and cumulative fee counters, and transfers all native tokens and memecoins straight to the `MemecoinTreasury`.
+
+---
+
+## 5. Getters & Configuration
+
+### `position` (View)
+```solidity
+function position(PoolId _poolId) public view returns (uint amount0_, uint amount1_, uint pendingEth_)
+```
+* **What it does:** Returns the current amount of `token0` and `token1` locked in the active BidWall position, as well as any pending fees waiting to be deployed.
+
+### `setSwapFeeThreshold` & `setStaleTimeWindow`
+* **Who can call:** The protocol owner.
+* **What they do:** Adjust the global threshold constants (`_swapFeeThreshold` and `staleTimeWindow`).
+
+### `_getSwapFeeThreshold` (Internal View Virtual)
+* **What it does:** Returns the threshold comparison value. Being `virtual` allows subclass versions of this contract to implement dynamic or progressive thresholds (e.g. thresholds that scale up as pool volume increases).
+
+
+
+
+Viewed BidWall.sol:427-464
+Edited launch.txt
+Edited feeEscrow.txt
+Edited bidwall.txt
+Edited FeeAndPricing.txt
+
+**No, it supports both token0 and token1, but it only ever deposits the native token (ETH/USDC) when creating/minting the position.**
+
+Here is the distinction:
+
+### 1. It supports both `token0` and `token1` as the native asset
+The contract does not assume the native token (ETH/USDC) is always `token0`. It dynamically checks `_nativeIsZero` and handles both configurations:
+* **If Native is `token0` (`_nativeIsZero == true`):** It calculates liquidity using `amount0: _ethAmount` via `getLiquidityForAmount0`.
+* **If Native is `token1` (`_nativeIsZero == false`):** It calculates liquidity using `amount1: _ethAmount` via `getLiquidityForAmount1`.
+
+---
+
+### 2. The position only contains the Native Token (ETH/USDC) at minting
+At the moment the position is created or repositioned, **it is a single-sided position consisting of 100% native tokens.** 
+
+Because the position is placed **1 tick below the spot price**, it acts as a limit buy order. In Uniswap V3/V4, any active liquidity position that lies entirely below the current pool price consists of only the asset that buyers will receive when selling (the native token). No memecoins are needed or deposited by the BidWall contract.
+
+---
+
+### 3. How Memecoins enter the position
+While the BidWall only *deposits* native tokens, if the market price drops and traders sell their memecoins into the BidWall:
+1. The Uniswap pool automatically converts the native tokens (USDC/ETH) in the BidWall position into memecoins.
+2. If this happens and `_reposition` or `closeBidWall` is called, the contract pulls back **both** native tokens (remaining) and memecoins (purchased by the wall). 
+3. This is why `_removeLiquidity` returns two values:
+   ```solidity
+   (ethWithdrawn, memecoinWithdrawn) = _removeLiquidity(...);
+   ```
+4. Any withdrawn memecoins are then swept and sent to the token's treasury.
+
+
+
+
+Summary
+The BidWall is always setting a limit order to sell ETH/USDC in exchange for HNY.
+
+When ETH is token0, selling ETH corresponds to ticks above spot price.
+When ETH is token1, selling ETH corresponds to ticks below spot price.
+The _nativeIsZero branch ensures that no matter how the tokens are sorted, the ETH is always locked in the correct direction to act as a bid floor.

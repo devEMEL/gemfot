@@ -115,13 +115,8 @@ contract FeeEscrow is Ownable {
         // Reset our user's balance to prevent reentry
         balances[msg.sender] = 0;
 
-        // Convert the flETH balance held into native ETH
         if (_unwrap) {
-            // Handle a withdraw of the withdrawn ETH
-            IFLETH(nativeToken).withdraw(amount);
-            (bool _sent,) = payable(_recipient).call{value: amount}("");
-            require(_sent, "ETH Transfer Failed");
-            emit Withdrawal(msg.sender, _recipient, address(0), amount);
+            //should always be false
         }
         // Transfer flETH token without unwrapping
         else {
