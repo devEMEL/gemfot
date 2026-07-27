@@ -196,7 +196,6 @@ abstract contract FeeDistributor is Ownable {
         // Take our swap fees from the {PoolManager}
         _poolManager.take(_swapFeeCurrency, address(this), swapFee_);
     }
-  
 
     /**
      * Taking an amount, show the split that each of the different recipients will receive.
@@ -300,7 +299,6 @@ abstract contract FeeDistributor is Ownable {
         }
 
         // Referrer fee excluded
-
 
         // Ensure our protocol fee is below 10%
         if (_feeDistribution.protocol > MAX_PROTOCOL_ALLOCATION) {

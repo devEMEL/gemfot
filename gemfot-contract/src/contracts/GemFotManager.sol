@@ -31,8 +31,7 @@ import {
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
-import {BaseHook} from "@uniswap/v4-periphery/base/hooks/BaseHook.sol";
-
+import {BaseHook} from "v4-hooks-public/lib/v4-periphery/src/utils/BaseHook.sol";
 import {IFeeCalculator} from "@gemfot-interfaces/IFeeCalculator.sol";
 
 /**
@@ -363,8 +362,6 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
         _emitPoolStateUpdate(poolId, IHooks.afterInitialize.selector, abi.encode(tokenId, _params));
     }
 
-
-
     /**
      * Returns the PoolKey mapped to the token address. If none is set then a zero value
      * will be returned for the fields.
@@ -375,12 +372,11 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
      *
      * @return The corresponding {PoolKey} for the token
      */
-    function poolKey(address _token) external view returns (PoolKey memory) {
+    function poolKey(
+        address _token
+    ) external view returns (PoolKey memory) {
         return _poolKeys[_token];
     }
-
-
-
 
     /**
      * Gets the USDC fee that must be paid to launch a token.
@@ -393,15 +389,18 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
         return initialPrice.getLaunchingFee(msg.sender, _initialPriceParams);
     }
 
-
-        /**
+    /**
      * Emits an event that provides pool state updates and passes the data to subscribers.
      *
      * @param _poolId The PoolId that has been updated
      * @param _key The selector being sent to notification subscribers
      * @param _data The data being sent to notification subscribers
      */
-    function _emitPoolStateUpdate(PoolId _poolId, bytes4 _key, bytes memory _data) internal {
+    function _emitPoolStateUpdate(
+        PoolId _poolId,
+        bytes4 _key,
+        bytes memory _data
+    ) internal {
         // Notify our subscribed contracts
         notifier.notifySubscribers(_poolId, _key, _data);
 
@@ -409,7 +408,6 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
         (uint160 sqrtPriceX96, int24 tick, uint24 protocolFee, uint24 swapFee) = poolManager.getSlot0(_poolId);
         emit PoolStateUpdated(_poolId, sqrtPriceX96, tick, protocolFee, swapFee, poolManager.getLiquidity(_poolId));
     }
-
 
     /**
      * Defines the Uniswap V4 hooks that are used by our implementation. This will determine
@@ -444,7 +442,11 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
      * @dev As we call `poolManager.initialize` from the IHooks contract itself, we bypass this
      * hook call as therefore bypass the prevention.
      */
-    function beforeInitialize(address, PoolKey calldata, uint160) external view override onlyPoolManager returns (bytes4) {
+    function beforeInitialize(
+        address,
+        PoolKey calldata,
+        uint160
+    ) external view override onlyPoolManager returns (bytes4) {
         revert CannotBeInitializedDirectly();
     }
 
@@ -454,7 +456,9 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
      *
      * @param _initialPrice The contract address for the `IInitialPrice` contract
      */
-    function setInitialPrice(address _initialPrice) public onlyOwner {
+    function setInitialPrice(
+        address _initialPrice
+    ) public onlyOwner {
         initialPrice = IInitialPrice(_initialPrice);
         emit InitialPriceUpdated(_initialPrice);
     }
@@ -462,9 +466,13 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
     /**
      * Calls for the BidWall to be closed, as this requires callback from the {PoolManager}.
      */
-    function closeBidWall(PoolKey memory _key) public {
+    function closeBidWall(
+        PoolKey memory _key
+    ) public {
         // Ensure that the call is made by the BidWall which validates logic
-        if (msg.sender != address(bidWall)) revert CallerIsNotBidWall();
+        if (msg.sender != address(bidWall)) {
+            revert CallerIsNotBidWall();
+        }
 
         // Ensure that the PoolKey that is being closed is valid and recognised on the protocol,
         // otherwise we could processing issues and false positives in upcoming steps. We need to
@@ -487,8 +495,9 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
      *
      * @return bytes Empty data; nothing will be returned
      */
-    function _unlockCallback(bytes calldata _data) internal override returns (bytes memory) {
+    function _unlockCallback(
+        bytes calldata _data
+    ) internal override returns (bytes memory) {
         bidWall.closeBidWall(abi.decode(_data, (PoolKey)));
     }
-
 }

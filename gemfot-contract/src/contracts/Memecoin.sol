@@ -108,13 +108,12 @@ contract Memecoin is ERC20PermitUpgradeable, IMemecoin {
     }
 
     function _update(
-    address from,
-    address to,
-    uint256 amount
-) internal override(ERC20Upgradeable) {
-    super._update(from, to, amount);
-}
-
+        address from,
+        address to,
+        uint amount
+    ) internal override(ERC20Upgradeable) {
+        super._update(from, to, amount);
+    }
 
     /**
      * Destroys a `value` amount of tokens from `account`, deducting from
@@ -237,7 +236,6 @@ contract Memecoin is ERC20PermitUpgradeable, IMemecoin {
         return "1.0.2";
     }
 
-
     /*Define our supported interfaces through contract extension.
      *
      */
@@ -248,11 +246,11 @@ contract Memecoin is ERC20PermitUpgradeable, IMemecoin {
             // Base token interfaces
             _interfaceId == type(IERC20).interfaceId || 
 
-            // Permit interface
-            _interfaceId == type(IERC20Permit).interfaceId || 
+                // Permit interface
+                _interfaceId == type(IERC20Permit).interfaceId || 
 
-            // Memecoin interface
-            _interfaceId == type(IMemecoin).interfaceId
+                // Memecoin interface
+                _interfaceId == type(IMemecoin).interfaceId
         );
     }
 
