@@ -10,21 +10,21 @@ import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {Launch} from "@gemfot/Launch.sol";
 
 /**
- * Creates an evolving list of pools on Flaunch and maps its corresponding token
+ * Creates an evolving list of pools on Launch and maps its corresponding token
  * information for onchain lookups.
  */
 contract IndexerSubscriber is Ownable {
     using PoolIdLibrary for PoolKey;
 
-    error InvalidTokenId(address _flaunch, uint _tokenId);
+    error InvalidTokenId(address _launch, uint _tokenId);
 
     /**
      * Contains index information for a token.
      *
-     * @member launch The {Flaunch} contract that launched the token
-     * @member memecoin The ERC20 memecoin address
-     * @member memecoinTreasury The contract address for the memecoin treasury
-     * @member tokenId The ERC721 {Flaunch} token created with the memecoin
+     * @custom:member launch The {Launch} contract that launched the token
+     * @custom:member memecoin The ERC20 memecoin address
+     * @custom:member memecoinTreasury The contract address for the memecoin treasury
+     * @custom:member tokenId The ERC721 {Launch} token created with the memecoin
      */
     struct Index {
         address launch;
@@ -36,8 +36,8 @@ contract IndexerSubscriber is Ownable {
     /**
      * Contains information required for created a legacy index.
      *
-     * @member launch The {Flaunch} contract that launched the token
-     * @member tokenId The ERC721 {Flaunch} token IDs created with the memecoin
+     * @custom:member launch The {Launch} contract that launched the token
+     * @custom:member tokenId The ERC721 {Launch} token IDs created with the memecoin
      */
     struct AddIndexParams {
         address launch;
@@ -47,7 +47,7 @@ contract IndexerSubscriber is Ownable {
     /// Maps a PoolId to the token index information
     mapping(PoolId _poolId => Index _index) internal _poolIndex;
 
-    /// Maps a PoolId to a Flaunch contract
+    /// Maps a PoolId to a Launch contract
     mapping(PoolId _poolId => Launch _launch) internal _poolLaunch;
 
     /// Maps each notifier to the launch contract that it will represent
@@ -74,7 +74,7 @@ contract IndexerSubscriber is Ownable {
     }
 
     /**
-     * Whenever a token is flaunched, we will index the token information onchain.
+     * Whenever a token is launched, we will index the token information onchain.
      *
      * @dev Called when `afterInitialize` is triggered.
      *
@@ -122,15 +122,14 @@ contract IndexerSubscriber is Ownable {
      * @dev To conform to existing integrations, we return the struct members individually.
      *
      * @param _poolId The PoolId to get the index information for
-     *
-     * @return flaunch_ The {Flaunch} contract that launched the token
+     * @return launch_ The {Launch} contract that launched the token
      * @return memecoin_ The memecoin address
      * @return memecoinTreasury_ The memecoin treasury address
      * @return tokenId_ The tokenId created with the pool (0 if burned)
      */
     function poolIndex(
         PoolId _poolId
-    ) public view returns (address flaunch_, address memecoin_, address memecoinTreasury_, uint tokenId_) {
+    ) public view returns (address launch_, address memecoin_, address memecoinTreasury_, uint tokenId_) {
         // Get the index information for the given PoolId
         Index memory poolIndex_ = _poolIndex[_poolId];
 
@@ -141,7 +140,7 @@ contract IndexerSubscriber is Ownable {
             try _poolLaunch[_poolId].ownerOf(poolIndex_.tokenId) returns (
                 address owner
             ) {
-            // ..
+            //
             }
             catch {
                 poolIndex_.tokenId = 0;
@@ -152,7 +151,7 @@ contract IndexerSubscriber is Ownable {
     }
 
     /**
-     * For tokens that were flaunched before this Notifier was put in place, we allow the
+     * For tokens that were launched before this Notifier was put in place, we allow the
      * information to be back-filled. The data is validated before being written and will
      * revert if it is deemed invalid.
      *
@@ -209,15 +208,15 @@ contract IndexerSubscriber is Ownable {
     }
 
     /**
-     * Allows our owner to set {Flaunch} contracts for each {Notifier}.
+     * Allows our owner to set {Launch} contracts for each {Notifier}.
      *
      * @param _notifier The {Notifier} contract address
-     * @param _flaunch The {Flaunch} contract of the Notifier
+     * @param _launch The {Launch} contract of the Notifier
      */
-    function setNotifierFlaunch(
+    function setNotifierLaunch(
         address _notifier,
-        address _flaunch
+        address _launch
     ) public onlyOwner {
-        _notifierLaunch[_notifier] = _flaunch;
+        _notifierLaunch[_notifier] = _launch;
     }
 }

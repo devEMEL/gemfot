@@ -9,7 +9,8 @@ import {Currency, CurrencyLibrary} from "@uniswap/v4-core/src/types/Currency.sol
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 
-import {CurrencySettler} from "@gemfot/libraries/CurrencySettler.sol";
+import {SwapParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
+import {CurrencySettler} from "@uniswap/v4-core/test/utils/CurrencySettler.sol";
 
 /**
  * This frontruns Uniswap to sell undesired token amounts from our fees into desired tokens
@@ -106,7 +107,7 @@ abstract contract InternalSwapPool {
     function _internalSwap(
         IPoolManager _poolManager,
         PoolKey calldata _key,
-        IPoolManager.SwapParams memory _params,
+        SwapParams memory _params,
         bool _nativeIsZero
     ) internal returns (uint ethIn_, uint tokenOut_) {
         PoolId poolId = _key.toId();

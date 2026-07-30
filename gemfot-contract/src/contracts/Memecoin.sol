@@ -33,6 +33,9 @@ contract Memecoin is ERC20PermitUpgradeable, IMemecoin {
     /// Token URI
     string public tokenURI;
 
+    /// TotalSupply
+    uint public _totalSupply;
+
     /// The respective Launch ERC721 for this contract
     Launch public launch;
 
@@ -67,12 +70,14 @@ contract Memecoin is ERC20PermitUpgradeable, IMemecoin {
     function initialize(
         string calldata name_,
         string calldata symbol_,
-        string calldata tokenUri_
+        string calldata tokenUri_,
+        uint totalSupply_
     ) public override initializer {
         // Initialises our token based on the implementation
         _name = name_;
         _symbol = symbol_;
         tokenURI = tokenUri_;
+        _totalSupply = totalSupply_;
 
         launch = Launch(msg.sender);
 
@@ -159,6 +164,13 @@ contract Memecoin is ERC20PermitUpgradeable, IMemecoin {
      */
     function symbol() public view override(ERC20Upgradeable, IMemecoin) returns (string memory) {
         return _symbol;
+    }
+
+    /**
+     * Returns the total supply of the token.
+     */
+    function totalSupply() public view override(ERC20Upgradeable, IMemecoin) returns (uint) {
+        return _totalSupply;
     }
 
     /**

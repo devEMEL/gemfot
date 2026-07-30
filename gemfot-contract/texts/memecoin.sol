@@ -1,0 +1,1 @@
+check Memecoin.sol and IMemecoin.sol, add the token totalSupply and function to read it, also update the interface

@@ -11,6 +11,7 @@ import {LaunchFeeExemption} from "../price/LaunchFeeExemption.sol"; // Adjust pa
 import {TokenSupply} from "../libraries/TokenSupply.sol"; // Adjust path based on directory structure
 
 import {IInitialPrice} from "../../interfaces/IInitialPrice.sol"; // Adjust path based on directory structure
+import {MarketCappedPriceParams} from "@gemfot/types/USDCMarketCappedPrice.sol";
 
 /**
  * @title USDCMarketCappedPrice
@@ -25,18 +26,9 @@ contract USDCMarketCappedPrice is IInitialPrice, Ownable {
     using PoolIdLibrary for PoolKey;
 
     error MarketCapTooSmall(uint _usdcMarketCap, uint _usdcMarketCapMinimum);
+    error TotalSupplyOutOfRange(uint _totalSupply, uint _totalSupplyMinimum, uint _totalSupplyMaximum);
 
     event LaunchFeeThresholdUpdated(uint _launchFeeThreshold);
-
-    /**
-     * The struct of data passed from the launching flow to define the
-     * desired market cap when a token is launched.
-     *
-     * @member usdcMarketCap The USDC price of the token market cap (scaled by USDC's 6 decimals)
-     */
-    struct MarketCappedPriceParams {
-        uint usdcMarketCap;
-    }
 
     /// Sets a minimum market cap threshold ($1,000, scaled to USDC's 6 decimals)
     uint public constant MINIMUM_USDC_MARKET_CAP = 1000 * 1e6;
@@ -73,6 +65,11 @@ contract USDCMarketCappedPrice is IInitialPrice, Ownable {
         bytes calldata _initialPriceParams
     ) public view returns (uint) {
         (MarketCappedPriceParams memory params) = abi.decode(_initialPriceParams, (MarketCappedPriceParams));
+
+        // Ensure that our requested total supply is within the allowed range
+        if (params.totalSupply < TokenSupply.MIN_TOTAL_SUPPLY || params.totalSupply > TokenSupply.MAX_TOTAL_SUPPLY) {
+            revert TotalSupplyOutOfRange(params.totalSupply, TokenSupply.MIN_TOTAL_SUPPLY, TokenSupply.MAX_TOTAL_SUPPLY);
+        }
 
         // If the fee is below our set threshold, then we want to exclude the fee
         if (params.usdcMarketCap <= launchFeeThreshold) {
@@ -121,10 +118,11 @@ contract USDCMarketCappedPrice is IInitialPrice, Ownable {
         bool _flipped,
         bytes calldata _initialPriceParams
     ) public view virtual returns (uint160 sqrtPriceX96_) {
+        (MarketCappedPriceParams memory params) = abi.decode(_initialPriceParams, (MarketCappedPriceParams));
         // Since native token is USDC, the target valuation is simply the market cap amount
         uint usdcAmount = getMarketCap(_initialPriceParams);
 
-        return _calculateSqrtPriceX96(usdcAmount, TokenSupply.INITIAL_SUPPLY, !_flipped);
+        return _calculateSqrtPriceX96(usdcAmount, params.totalSupply, !_flipped);
     }
 
     /**

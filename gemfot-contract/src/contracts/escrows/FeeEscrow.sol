@@ -19,6 +19,7 @@ contract FeeEscrow is Ownable {
     error InvalidRecipient();
     error PoolIdNotIndexed();
     error RecipientZeroAddress();
+    using SafeTransferLib for address;
 
     /// Emitted when fees are added to a payee
     event Deposit(PoolId indexed _poolId, address _payee, address _token, uint _amount);
@@ -88,8 +89,8 @@ contract FeeEscrow is Ownable {
             totalFeesAllocated[_poolId] += _amount;
         }
 
-        // Transfer flETH from the sender into this escrow
-        IERC20(nativeToken).transferFrom(msg.sender, address(this), _amount);
+        // Transfer USDC from the sender into this escrow
+        nativeToken.safeTransferFrom(msg.sender, address(this), _amount);
 
         emit Deposit(_poolId, _recipient, nativeToken, _amount);
     }
@@ -98,11 +99,9 @@ contract FeeEscrow is Ownable {
      * Allows fees to be withdrawn from escrowed fee positions.
      *
      * @param _recipient The recipient of the holder's withdraw
-     * @param _unwrap If we want to unwrap the balance from flETH into ETH
      */
     function withdrawFees(
-        address _recipient,
-        bool _unwrap
+        address _recipient
     ) public {
         // Get the amount of token that is stored in escrow
         uint amount = balances[msg.sender];
@@ -115,14 +114,8 @@ contract FeeEscrow is Ownable {
         // Reset our user's balance to prevent reentry
         balances[msg.sender] = 0;
 
-        if (_unwrap) {
-            //should always be false
-        }
-        // Transfer flETH token without unwrapping
-        else {
-            SafeTransferLib.safeTransfer(nativeToken, _recipient, amount);
-            emit Withdrawal(msg.sender, _recipient, nativeToken, amount);
-        }
+        SafeTransferLib.safeTransfer(nativeToken, _recipient, amount);
+        emit Withdrawal(msg.sender, _recipient, nativeToken, amount);
     }
 
     /**
@@ -130,11 +123,11 @@ contract FeeEscrow is Ownable {
      *
      * @param _indexer The new {IndexerSubscriber} contract address
      */
-    function setIndexer(
-        address _indexer
-    ) public onlyOwner {
-        indexer = IndexerSubscriber(_indexer);
-    }
+    // function setIndexer(
+    //     address _indexer
+    // ) public onlyOwner {
+    //     indexer = IndexerSubscriber(_indexer);
+    // }
 
     /**
      * Allows the contract to receive ETH when withdrawn from the flETH token.

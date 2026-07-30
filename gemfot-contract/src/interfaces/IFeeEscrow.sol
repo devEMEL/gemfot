@@ -21,7 +21,6 @@ interface IFeeEscrow {
     ) external;
 
     function withdrawFees(
-        address _recipient,
-        bool _unwrap
+        address _recipient
     ) external;
 }

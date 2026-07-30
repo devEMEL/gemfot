@@ -108,7 +108,7 @@ contract MemecoinTreasury is Initializable, ReentrancyGuard {
      * @dev This call does not require protection and can be called by anyone
      */
     function claimFees() public {
-        gemfotManager.feeEscrow().withdrawFees(address(this), false);
+        gemfotManager.feeEscrow().withdrawFees(address(this));
     }
 
     receive() external payable {}

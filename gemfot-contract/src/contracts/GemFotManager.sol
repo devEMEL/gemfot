@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
+import {IFeeCalculator} from "@gemfot-interfaces/IFeeCalculator.sol";
 import {IInitialPrice} from "@gemfot-interfaces/IInitialPrice.sol";
 import {ILaunch} from "@gemfot-interfaces/ILaunch.sol";
 import {IMemecoin} from "@gemfot-interfaces/IMemecoin.sol";
@@ -10,12 +11,12 @@ import {FeeDistributor} from "@gemfot/hooks/FeeDistributor.sol";
 import {FeeExemptions} from "@gemfot/hooks/FeeExemptions.sol";
 import {InternalSwapPool} from "@gemfot/hooks/InternalSwapPool.sol";
 import {Notifier} from "@gemfot/hooks/Notifier.sol";
-import {CurrencySettler} from "@gemfot/libraries/CurrencySettler.sol";
 import {UniswapHookEvents} from "@gemfot/libraries/UniswapHookEvents.sol";
 import {TreasuryActionManager} from "@gemfot/treasury/ActionManager.sol";
 import {MemecoinTreasury} from "@gemfot/treasury/MemecoinTreasury.sol";
 import {MemecoinFinder} from "@gemfot/types/MemecoinFinder.sol";
 import {StoreKeys} from "@gemfot/types/StoreKeys.sol";
+import {MarketCappedPriceParams} from "@gemfot/types/USDCMarketCappedPrice.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeTransferLib} from "@solady/utils/SafeTransferLib.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
@@ -31,11 +32,13 @@ import {
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {CurrencySettler} from "@uniswap/v4-core/test/utils/CurrencySettler.sol";
 import {BaseHook} from "v4-hooks-public/lib/v4-periphery/src/utils/BaseHook.sol";
-import {IFeeCalculator} from "@gemfot-interfaces/IFeeCalculator.sol";
+import {ModifyLiquidityParams, SwapParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
+
 
 /**
- * The PositionManager is a Uniswap V4 hook that controls the user journey from token creation,
+ * The GemFotManager is a Uniswap V4 hook that controls the user journey from token creation,
  * to fair launch, to ongoing swaps.
  *
  * The creator of the pool will receive an ERC721 representation of the token. The holder of
@@ -53,12 +56,14 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
     using SafeCast for uint;
     using StateLibrary for IPoolManager;
     using MemecoinFinder for PoolKey;
+    using SafeTransferLib for address;
 
     error CallerIsNotBidWall();
     error CannotBeInitializedDirectly();
     error InsufficientLaunchFee(uint _paid, uint _required);
     error TokenNotLaunched(uint _launchesAt);
     error UnknownPool(PoolId _poolId);
+
 
     /// Emitted when a Flaunch pool is created
     event PoolCreated(
@@ -113,17 +118,17 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
     /**
      * Defines our constructor parameters.
      *
-     * @member nativeToken The native ETH equivalent token used by protocol
-     * @member poolManager The Uniswap V4 {PoolManager} contract
-     * @member feeDistribution The default fee distribution configuration
-     * @member initialPrice Set initial price calculator address
-     * @member protocolOwner The EOA that will be the initial owner
-     * @member protocolFeeRecipient The recipient EOA of all
-     * @member feeEscrow The {FeeEscrow} contract to be used by the PositionManager
-     * @member feeExemptions The default global FeeExemption values
-     * @member actionManager The {TreasuryActionManager} contract
-     * @member bidWall The {BidWall} contract to be used by the PositionManager
-     * @member fairLaunch The {FairLaunch} contract to be used by the PositionManager
+     * @custom:member nativeToken The native ETH equivalent token used by protocol
+     * @custom:member poolManager The Uniswap V4 {PoolManager} contract
+     * @custom:member feeDistribution The default fee distribution configuration
+     * @custom:member initialPrice Set initial price calculator address
+     * @custom:member protocolOwner The EOA that will be the initial owner
+     * @custom:member protocolFeeRecipient The recipient EOA of all
+     * @custom:member feeEscrow The {FeeEscrow} contract to be used by the PositionManager
+     * @custom:member feeExemptions The default global FeeExemption values
+     * @custom:member actionManager The {TreasuryActionManager} contract
+     * @custom:member bidWall The {BidWall} contract to be used by the PositionManager
+     * @custom:member fairLaunch The {FairLaunch} contract to be used by the PositionManager
      */
     struct ConstructorParams {
         address nativeToken;
@@ -142,17 +147,17 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
     /**
      * Parameters required when launching a new token.
      *
-     * @member name Name of the token
-     * @member symbol Symbol of the token
-     * @member tokenUri The generated ERC721 token URI
-     * @member initialTokenFairLaunch The amount of tokens to add as single sided fair launch liquidity
-     * @member fairLaunchDuration The duration of the fair launch period (in seconds - YEAH YEAH)
-     * @member premineAmount The amount of tokens that the creator will buy themselves
-     * @member creator The address that will receive the ERC721 ownership and premined ERC20 tokens
-     * @member creatorFeeAllocation The percentage of fees the creators wants to take from the BidWall
-     * @member launchAt The timestamp at which the token will launch
-     * @member initialPriceParams The encoded parameters for the Initial Price logic
-     * @member feeCalculatorParams The encoded parameters for the fee calculator
+     * @custom:member name Name of the token
+     * @custom:member symbol Symbol of the token
+     * @custom:member tokenUri The generated ERC721 token URI
+     * @custom:member initialTokenFairLaunch The amount of tokens to add as single sided fair launch liquidity
+     * @custom:member fairLaunchDuration The duration of the fair launch period (in seconds - YEAH YEAH)
+     * @custom:member premineAmount The amount of tokens that the creator will buy themselves
+     * @custom:member creator The address that will receive the ERC721 ownership and premined ERC20 tokens
+     * @custom:member creatorFeeAllocation The percentage of fees the creators wants to take from the BidWall
+     * @custom:member launchAt The timestamp at which the token will launch
+     * @custom:member initialPriceParams The encoded parameters for the Initial Price logic
+     * @custom:member feeCalculatorParams The encoded parameters for the fee calculator
      */
     struct LaunchParams {
         string name;
@@ -250,6 +255,8 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
     function launch(
         LaunchParams calldata _params
     ) external payable returns (address memecoin_) {
+        (MarketCappedPriceParams memory params) = abi.decode(_params.initialPriceParams, (MarketCappedPriceParams));
+
         uint tokenId;
         address payable memecoinTreasury;
 
@@ -330,6 +337,7 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
             _initialTick: initialTick,
             _launchesAt: _params.launchAt > block.timestamp ? _params.launchAt : block.timestamp,
             _initialTokenFairLaunch: _params.initialTokenFairLaunch,
+            _tokenTotalSupply: params.totalSupply,
             _fairLaunchDuration: _params.fairLaunchDuration
         });
 
@@ -353,7 +361,7 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
             }
 
             // Pay the launching fee to our fee recipient
-            SafeTransferLib.safeTransferFrom(nativeToken, msg.sender, protocolFeeRecipient, launchFee);
+            nativeToken.safeTransferFrom(msg.sender, protocolFeeRecipient, launchFee);
         }
 
         // After our contract is initialized, we mark our pool as initialized and emit
@@ -389,25 +397,6 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
         return initialPrice.getLaunchingFee(msg.sender, _initialPriceParams);
     }
 
-    /**
-     * Emits an event that provides pool state updates and passes the data to subscribers.
-     *
-     * @param _poolId The PoolId that has been updated
-     * @param _key The selector being sent to notification subscribers
-     * @param _data The data being sent to notification subscribers
-     */
-    function _emitPoolStateUpdate(
-        PoolId _poolId,
-        bytes4 _key,
-        bytes memory _data
-    ) internal {
-        // Notify our subscribed contracts
-        notifier.notifySubscribers(_poolId, _key, _data);
-
-        // Emit our event
-        (uint160 sqrtPriceX96, int24 tick, uint24 protocolFee, uint24 swapFee) = poolManager.getSlot0(_poolId);
-        emit PoolStateUpdated(_poolId, sqrtPriceX96, tick, protocolFee, swapFee, poolManager.getLiquidity(_poolId));
-    }
 
     /**
      * Defines the Uniswap V4 hooks that are used by our implementation. This will determine
@@ -442,13 +431,304 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
      * @dev As we call `poolManager.initialize` from the IHooks contract itself, we bypass this
      * hook call as therefore bypass the prevention.
      */
-    function beforeInitialize(
+    function _beforeInitialize(
         address,
         PoolKey calldata,
         uint160
-    ) external view override onlyPoolManager returns (bytes4) {
+    ) internal override onlyPoolManager returns (bytes4) {
         revert CannotBeInitializedDirectly();
     }
+
+
+    /**
+     * [ISP] Fills first from fee-token inventory, then reduces the remaining swap amount.
+     * [FL] Fills any remaining amount from FairLaunch (and closes when supply hits zero / window ends).
+     * [FD] Captures fees from both ISP and FairLaunch fills.
+     *
+     * @param _sender The address calling the swap
+     * @param _key The key for the pool
+     * @param _params The parameters for the swap
+     * @param _hookData Arbitrary data handed into the PoolManager by the swapper to be be passed on to the hook
+     *
+     * @return selector_ The function selector for the hook
+     * @return beforeSwapDelta_ The hook's delta in specified and unspecified currencies. Positive: the hook is owed/took currency, negative: the hook owes/sent currency
+     * @return swapFee_ The percentage fee applied to our swap
+     */
+
+    //  function _beforeSwap(address sender, PoolKey calldata key, SwapParams calldata params, bytes calldata hookData) internal override returns (bytes4 selector_, BeforeSwapDelta beforeSwapDelta_, uint24 swapFee_)
+
+    function _beforeSwap(
+        address _sender,
+        PoolKey calldata _key,
+        SwapParams calldata _params,
+        bytes calldata _hookData
+    ) internal override returns (
+        bytes4 selector_,
+        BeforeSwapDelta beforeSwapDelta_,
+        uint24
+    ) {
+        /**
+         * [SCHEDULE][PREMINE] Check if the token is scheduled to be flaunched and only
+         * allow a swap to take place if there is a premine call available.
+         */
+
+        {
+            // If set, get the timestamp that the pool is scheduled to flaunch
+            PoolId poolId = _key.toId();
+            uint _flaunchesAt = launchesAt[poolId];
+            if (_flaunchesAt != 0) {
+                // If we have a schedule set for the token, then we need to make an additional
+                // check to see if a premine is set, and if it's valid. The validity of a premine
+                // ensures that we are in the same block and that the amount specified is the same.
+                // We cannot check that the caller is the same as the `_sender` is obfuscated to
+                // be the swap contract.
+                int premineAmount = _tload(PoolId.unwrap(poolId));
+                if (premineAmount != 0 && _params.amountSpecified == premineAmount) {
+                    emit PoolPremine(poolId, premineAmount);
+                } else {
+                    // If the timestamp has not yet passed, then we revert
+                    if (_flaunchesAt > block.timestamp) {
+                        revert TokenNotLaunched(_flaunchesAt);
+                    }
+
+                    // Remove the schedule timestamp to prevent future checks
+                    delete launchesAt[poolId];
+                }
+            }
+        }
+
+        PoolId poolId = _key.toId();
+        bool nativeIsZero = nativeToken == Currency.unwrap(_key.currency0);
+        // Remaining amount for FairLaunch / Uniswap after ISP fills first
+        int amountRemaining = _params.amountSpecified;
+
+        // Check if our fair launch period hasn't ended and already been processed
+        FairLaunch.FairLaunchInfo memory fairLaunchInfo = fairLaunch.fairLaunchInfo(poolId);
+        bool inActiveFairLaunch;
+
+        if (!fairLaunchInfo.closed) {
+            /**
+             * [FL] If it's not premine, and the FairLaunch window has ended, but our position is still open, then we
+             * need to close the position.
+             */
+            if (_tload(PoolId.unwrap(poolId)) == 0 && !fairLaunch.inFairLaunchWindow(poolId)) {
+                uint unsoldSupply = fairLaunchInfo.supply;
+
+                // closes the fair launch position, putting remaining memecoin supply into the liquidity pool
+                // minus the unsold fair launch supply, which is burned
+                fairLaunch.closePosition({
+                    _poolKey: _key,
+                    _tokenFees: _poolFees[poolId].amount1,
+                    _nativeIsZero: nativeIsZero
+                });
+
+                // burn the unsold fair launch supply
+                if (unsoldSupply != 0) {
+                    (nativeIsZero ? _key.currency1 : _key.currency0).transfer(BURN_ADDRESS, unsoldSupply);
+                    emit FairLaunchBurn(poolId, unsoldSupply);
+                }
+            } else {
+                /**
+                 * [FL] If we are still in the FairLaunch window, then we need to prevent any swaps that
+                 * are specified to sell the {Memecoin}.
+                 */
+                if (nativeIsZero != _params.zeroForOne) {
+                    revert FairLaunch.CannotSellTokenDuringFairLaunch();
+                }
+
+                inActiveFairLaunch = true;
+            }
+        }
+
+        /**
+         * [ISP] Fill first from fee-token inventory (e.g. -100 USDC with 10 USDC of fees → take 10 here).
+         * Remaining amount is then passed to FairLaunch / Uniswap.
+         */
+        (uint tokenIn, uint tokenOut) = _internalSwap(poolManager, _key, _params, nativeIsZero);
+        if (tokenIn + tokenOut != 0) {
+            // Update our hook delta to reduce the upcoming swap amount to show that we have
+            // already spent some of the ETH and received some of the underlying ERC20.
+            BeforeSwapDelta internalBeforeSwapDelta = _params.amountSpecified >= 0
+                ? toBeforeSwapDelta(-tokenOut.toInt128(), tokenIn.toInt128())
+                : toBeforeSwapDelta(tokenIn.toInt128(), -tokenOut.toInt128());
+
+            /**
+             * [FD] We need to determine the amount of fees generated by our internal swap to capture,
+             * rather than sending the full amount to the end user.
+             */
+            uint swapFee = _captureAndDepositFees(
+                _key, _params, _sender, internalBeforeSwapDelta.getUnspecifiedDelta(), _hookData
+            );
+
+            // Increment our swap
+            _captureDelta(_params, TS_ISP_AMOUNT0, TS_ISP_AMOUNT1, internalBeforeSwapDelta);
+            _captureDeltaSwapFee(_params, TS_ISP_FEE0, TS_ISP_FEE1, swapFee);
+
+            beforeSwapDelta_ = toBeforeSwapDelta(
+                beforeSwapDelta_.getSpecifiedDelta() + internalBeforeSwapDelta.getSpecifiedDelta(),
+                beforeSwapDelta_.getUnspecifiedDelta() + internalBeforeSwapDelta.getUnspecifiedDelta()
+                    + swapFee.toInt128()
+            );
+
+            // exact input (-100): remaining = -100 + 10 = -90
+            // exact output (+tokens): remaining = wanted - tokenOut
+            amountRemaining = _params.amountSpecified >= 0
+                ? amountRemaining - int(tokenOut)
+                : amountRemaining + int(tokenIn);
+        }
+
+        /**
+         * [FL] Fill any remaining amount from the FairLaunch position after ISP.
+         */
+        if (inActiveFairLaunch && amountRemaining != 0) {
+            BalanceDelta fairLaunchFillDelta;
+            BeforeSwapDelta fairLaunchBeforeSwapDelta;
+            (fairLaunchBeforeSwapDelta, fairLaunchFillDelta, fairLaunchInfo) =
+                fairLaunch.fillFromPosition(_key, amountRemaining, nativeIsZero);
+
+            // Give the tokens to Uniswap V4 so that it can play good-cop and give them to the user
+            _settleDelta(_key, fairLaunchFillDelta);
+
+            /**
+             * [FD] We need to determine the amount of fees generated by our fair launch swap to
+             * capture, rather than sending the full amount to the end user.
+             */
+            uint swapFee = _captureAndDepositFees(
+                _key, _params, _sender, fairLaunchBeforeSwapDelta.getUnspecifiedDelta(), _hookData
+            );
+
+            // Increment our swap
+            _captureDelta(_params, TS_FL_AMOUNT0, TS_FL_AMOUNT1, fairLaunchBeforeSwapDelta);
+            _captureDeltaSwapFee(_params, TS_FL_FEE0, TS_FL_FEE1, swapFee);
+
+            // Combine ISP + FairLaunch deltas
+            beforeSwapDelta_ = toBeforeSwapDelta(
+                beforeSwapDelta_.getSpecifiedDelta() + fairLaunchBeforeSwapDelta.getSpecifiedDelta(),
+                beforeSwapDelta_.getUnspecifiedDelta() + fairLaunchBeforeSwapDelta.getUnspecifiedDelta()
+                    + swapFee.toInt128()
+            );
+
+            // A FairLaunch transaction will always facilitate purchasing Memecoin with
+            // Native Token. This means that if the `amountSpecified` not negative, then we will
+            // have captured the fee in Native Token and as such we need to reduce the amount of
+            // revenue that we record.
+            if (amountRemaining >= 0 && swapFee != 0) {
+                fairLaunch.modifyRevenue(poolId, -swapFee.toInt128());
+            }
+
+            // If we have run out of tokens, then we can close the pool
+            if (fairLaunchInfo.supply == 0) {
+                fairLaunch.closePosition({
+                    _poolKey: _key,
+                    _tokenFees: _poolFees[poolId].amount1,
+                    _nativeIsZero: nativeIsZero
+                });
+            }
+        }
+
+        /**
+         * [PREMINE] Delete our transient storage data to prevent premines ever being triggered
+         * over multiple swaps.
+         */
+        assembly {
+            tstore(poolId, 0)
+        }
+
+        // Capture the beforeSwap tick value before actioning our Uniswap swap
+        (, _beforeSwapTick,,) = poolManager.getSlot0(_key.toId());
+
+        // Check if the BidWall has become stale, and allow liquidity to be extracted before a
+        // threshold has been built.
+        bidWall.checkStalePosition({
+            _poolKey: _key,
+            _currentTick: _beforeSwapTick,
+            _nativeIsZero: nativeToken == Currency.unwrap(_key.currency0)
+        });
+
+        // Set our return selector
+        selector_ = IHooks.beforeSwap.selector;
+    }
+
+    /**
+     * [FD] Captures fees from the swap to either distribute or send to ISP
+     * [ISP] Once a swap has been made, we distribute fees to our LPs and emit our price update event.
+     * [FD] Tracks the swap for future fee calculations
+     * [FL][BW] If Fair Launch ended then we may have an ETH to deposit into the BidWall
+     *
+     * @param _sender The sender (or swap contract) making the call
+     * @param _key The key for the pool
+     * @param _params The parameters for the swap
+     * @param _delta The amount owed to the caller (positive) or owed to the pool (negative)
+     * @param _hookData Arbitrary data handed into the PoolManager by the swapper to be be passed on to the hook
+     *
+     * @return selector_ The function selector for the hook
+     * @return hookDeltaUnspecified_ The hook's delta in unspecified currency. Positive: the hook is owed/took currency, negative: the hook owes/sent currency
+     */
+
+    //  function _afterSwap(address sender, PoolKey calldata key, SwapParams calldata params, BalanceDelta delta, bytes calldata hookData) internal override returns (bytes4 selector_, int128 hookDeltaUnspecified_) 
+
+    function _afterSwap(
+        address _sender,
+        PoolKey calldata _key,
+        SwapParams calldata _params,
+        BalanceDelta _delta,
+        bytes calldata _hookData
+    ) internal override returns (
+        bytes4 selector_,
+        int128 hookDeltaUnspecified_
+    ) {
+        /**
+         * [FD] We need to determine the amount of fees generated by our Uniswap swap to capture,
+         * rather than sending the full amount to the end user.
+         */
+
+        // Determine the currency that we will be taking our fee from
+        (int128 amount0, int128 amount1) = (_delta.amount0(), _delta.amount1());
+        int128 swapAmount = _params.amountSpecified < 0 == _params.zeroForOne ? amount1 : amount0;
+
+        // Capture the swap fees and dispatch the referrer's share if set
+        uint swapFee = _captureAndDepositFees(_key, _params, _sender, swapAmount, _hookData);
+
+        // Increment our swap
+        assembly {
+            tstore(TS_UNI_AMOUNT0, amount0)
+            tstore(TS_UNI_AMOUNT1, amount1)
+        }
+
+        _captureDeltaSwapFee(_params, TS_UNI_FEE0, TS_UNI_FEE1, swapFee);
+
+        /**
+         * [ISP] Distribute any fees that have been converted by the swap.
+         */
+
+        _distributeFees(_key);
+
+        /**
+         * [FD] If we have a feeCalculator, then we want to track the swap data for any
+         * dynamic calculations.
+         */
+
+        PoolId poolId = _key.toId();
+
+        {
+            IFeeCalculator _feeCalculator = getFeeCalculator(fairLaunch.inFairLaunchWindow(poolId));
+            if (address(_feeCalculator) != address(0)) {
+                _feeCalculator.trackSwap(_sender, _key, _params, _delta, _hookData);
+            }
+        }
+
+        // Set our return selector
+        hookDeltaUnspecified_ = swapFee.toInt128();
+
+        selector_ = IHooks.afterSwap.selector;
+
+        // Emit our compiled swap data
+        _emitSwapUpdate(poolId, _sender);
+
+        // Emit our pool state update to listeners
+        _emitPoolStateUpdate(poolId, selector_, abi.encode(_sender, _params, _delta));
+    }
+
 
     /**
      * Updates the `IInitialPrice` contract address that is used during `flaunch` to calculate
@@ -461,6 +741,166 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
     ) public onlyOwner {
         initialPrice = IInitialPrice(_initialPrice);
         emit InitialPriceUpdated(_initialPrice);
+    }
+
+
+
+    /**
+     * We want to be able to distribute fees across our {FeeDistribution} recipients
+     * when we reach a set threshold. This will only ever distribute the ETH equivalent
+     * token, as the non-ETH token will be converted via the {InternalSwapPool} hook logic.
+     *
+     * @dev There referrer has already received their share, so they do not need to be
+     * taken into account at this point.
+     *
+     * @param _poolKey The PoolKey reference that will have fees distributed
+     */
+    function _distributeFees(PoolKey memory _poolKey) internal {
+        PoolId poolId = _poolKey.toId();
+
+        // Get the amount of the native token available to distribute
+        uint distributeAmount = _poolFees[poolId].amount0;
+
+        // Ensure that the collection has sufficient fees available
+        if (distributeAmount < MIN_DISTRIBUTE_THRESHOLD) return;
+
+        // Reduce our available fees for the pool
+        _poolFees[poolId].amount0 = 0;
+
+        // Find the distribution amount across our different users. The amount that treasury
+        // receives will be determined by variables throughout the distribution flow, such as
+        // the BidWall being disabled, etc.
+        (uint bidWallFee, uint creatorFee, uint protocolFee) = feeSplit(poolId, distributeAmount);
+        uint treasuryFee;
+
+        // Load our memecoin so that we can query the creator and treasury
+        IMemecoin memecoin = _poolKey.memecoin(nativeToken);
+
+        // Check if our creator has been burned, as this changes fee allocation in a number of places
+        address poolCreator = memecoin.creator();
+        bool poolCreatorBurned = poolCreator == address(0);
+
+        if (creatorFee != 0) {
+            // Ensure that the pool creator has not burned their ownership and send them the fees
+            if (!poolCreatorBurned) {
+                _allocateFees(poolId, poolCreator, creatorFee);
+            }
+            // If the pool creator has burned their ownership, then we instead send fees directly
+            // to the BidWall.
+            else {
+                bidWallFee += creatorFee;
+                creatorFee = 0;
+            }
+        }
+
+        if (bidWallFee != 0) {
+            // Check if we have an active BidWall for the pool. If we don't have an active BidWall, then
+            // we will need to instead allocate this to the protocol. If we are still in the FairLaunch
+            // window the this will just carry over into the FairLaunch created position, so we already
+            // have this value attributed.
+            if (bidWall.isBidWallEnabled(poolId) && !fairLaunch.inFairLaunchWindow(poolId)) {
+                // Otherwise, we can deposit directly into the BidWall as we have permission to modify
+                // liquidity outside of the window.
+                bidWall.deposit(_poolKey, bidWallFee, _beforeSwapTick, nativeToken == Currency.unwrap(_poolKey.currency0));
+            } else {
+                // If we cannot import into BidWall, then treasury will be allocated the fees
+                treasuryFee += bidWallFee;
+                bidWallFee = 0;
+            }
+        }
+
+        if (treasuryFee != 0) {
+            // Ensure that the pool creator has not burned their ownership and send treasury the fees
+            if (!poolCreatorBurned) {
+                _allocateFees(poolId, memecoin.treasury(), treasuryFee);
+            } else {
+                // If we cannot allocate to treasury, then protocol receives the fees
+                protocolFee += treasuryFee;
+                treasuryFee = 0;
+            }
+        }
+
+        // Finally we allocate our protocol fees
+        if (protocolFee != 0) {
+            _allocateFees(poolId, protocolFeeRecipient, protocolFee);
+        }
+
+        emit PoolFeesDistributed(poolId, distributeAmount, creatorFee, bidWallFee, treasuryFee, protocolFee);
+    }
+
+
+
+    /**
+     * Using the `tstore` values that we have generated along the way, we emit an event that shows
+     * the breakdown of fees earned at each swap point.
+     *
+     * @param _poolId The PoolId that is being emitted
+     * @param _sender The router of the swap
+     */
+    function _emitSwapUpdate(PoolId _poolId, address _sender) internal {
+        // Emit our protocol-recognised event
+        emit PoolSwap(
+            _poolId,
+            _tload(TS_FL_AMOUNT0), _tload(TS_FL_AMOUNT1), _tload(TS_FL_FEE0), _tload(TS_FL_FEE1),
+            _tload(TS_ISP_AMOUNT0), _tload(TS_ISP_AMOUNT1), _tload(TS_ISP_FEE0), _tload(TS_ISP_FEE1),
+            _tload(TS_UNI_AMOUNT0), _tload(TS_UNI_AMOUNT1), _tload(TS_UNI_FEE0), _tload(TS_UNI_FEE1)
+        );
+
+        // Emit the Uniswap V4 standardised event
+        UniswapHookEvents.emitHookSwapEvent({
+            _poolId: _poolId,
+            _sender: _sender,
+            _amount0: _tload(TS_FL_AMOUNT0) + _tload(TS_ISP_AMOUNT0),
+            _amount1: _tload(TS_FL_AMOUNT1) + _tload(TS_ISP_AMOUNT1),
+            _fee0: _tload(TS_FL_FEE0) + _tload(TS_ISP_FEE0),
+            _fee1: _tload(TS_FL_FEE1) + _tload(TS_ISP_FEE1)
+        });
+
+        // @dev We flush the tstore values at this point as although they are only set
+        // explicitly and not modified, both the FL and ISP could be bypassed but the tstore
+        // data would remain.
+
+        assembly {
+            tstore(TS_FL_AMOUNT0, 0)
+            tstore(TS_FL_AMOUNT1, 0)
+            tstore(TS_FL_FEE0, 0)
+            tstore(TS_FL_FEE1, 0)
+            tstore(TS_ISP_AMOUNT0, 0)
+            tstore(TS_ISP_AMOUNT1, 0)
+            tstore(TS_ISP_FEE0, 0)
+            tstore(TS_ISP_FEE1, 0)
+            tstore(TS_UNI_AMOUNT0, 0)
+            tstore(TS_UNI_AMOUNT1, 0)
+            tstore(TS_UNI_FEE0, 0)
+            tstore(TS_UNI_FEE1, 0)
+        }
+    }
+
+    /**
+     * Emits an event that provides pool state updates and passes the data to subscribers.
+     *
+     * @param _poolId The PoolId that has been updated
+     * @param _key The selector being sent to notification subscribers
+     * @param _data The data being sent to notification subscribers
+     */
+     function _emitPoolStateUpdate(PoolId _poolId, bytes4 _key, bytes memory _data) internal {
+        // Notify our subscribed contracts
+        notifier.notifySubscribers(_poolId, _key, _data);
+
+        // Emit our event
+        (uint160 sqrtPriceX96, int24 tick, uint24 protocolFee, uint24 swapFee) = poolManager.getSlot0(_poolId);
+        emit PoolStateUpdated(_poolId, sqrtPriceX96, tick, protocolFee, swapFee, poolManager.getLiquidity(_poolId));
+    }
+
+    /**
+     * Allows the contract used to launch a new token to be updated.
+     *
+     * @param _launchContract The new {ILaunch} contract address
+     */
+    function setFlaunch(
+        address _launchContract
+    ) public onlyOwner {
+        launchContract = ILaunch(_launchContract);
     }
 
     /**
@@ -487,17 +927,170 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
         poolManager.unlock(abi.encode(_key));
     }
 
+
+    /**
+     * Capture the fees from our swap. This could either be from an internal swap (`beforeSwap`)
+     * or from the actual Uniswap swap (`afterSwap`).
+     *
+     * @dev This is only used due to too many variables in the `beforeSwap` function
+     *
+     * @param _key The {PoolKey} that the swap was made against
+     * @param _params The swap parameters called in the swap
+     * @param _sender The sender of the swap call
+     * @param _delta The balance change from the swap
+     * @param _hookData Additional bytes data passed in the swap
+     *
+     * @return swapFee_ The fee taken from the swap
+     */
+    function _captureAndDepositFees(
+        PoolKey calldata _key,
+        SwapParams memory _params,
+        address _sender,
+        int128 _delta,
+        bytes calldata _hookData
+    ) internal returns (uint swapFee_) {
+        // Determine the swap fee currency based on swap parameters
+        Currency swapFeeCurrency = _params.amountSpecified < 0 == _params.zeroForOne ? _key.currency1 : _key.currency0;
+
+        // Capture our swap fees amount
+        swapFee_ = _captureSwapFees({
+            _poolManager: poolManager,
+            _key: _key,
+            _params: _params,
+            _feeCalculator: getFeeCalculator(fairLaunch.inFairLaunchWindow(_key.toId())),
+            _swapFeeCurrency: swapFeeCurrency,
+            _swapAmount: uint128(_delta < 0 ? -_delta : _delta),
+            _feeExemption: feeExemptions.feeExemption(_sender)
+        });
+
+        // If we have no swap fees, then we have nothing to process
+        if (swapFee_ == 0) {
+            return swapFee_;
+        }
+
+        // Deposit the remaining fees against our pool to be either distributed to
+        // others, or placed into the Internal Swap Pool to be converted into an ETH
+        // equivalent token. We don't reduce the amount by referrer fees as we still
+        // need to claim this from the PoolManager.
+        _depositFees(
+            _key,
+            Currency.unwrap(swapFeeCurrency) == nativeToken ? swapFee_ : 0,
+            Currency.unwrap(swapFeeCurrency) == nativeToken ? 0 : swapFee_
+        );
+    }
+
+    /**
+     * We need to be able to set the (un)specified token to amount0 / amount1 for the expected
+     * event emit format.
+     *
+     * @param _params The `SwapParams` used to capture the delta
+     * @param _key_amount0 The tstore key for the token0 amount
+     * @param _key_amount1 The tstore key for the token1 amount
+     * @param _delta The `BeforeSwapDelta` that is being captured
+     */
+    function _captureDelta(
+        SwapParams memory _params,
+        bytes32 _key_amount0,
+        bytes32 _key_amount1,
+        BeforeSwapDelta _delta
+    ) internal {
+        (int token0, int token1) = _params.amountSpecified < 0 == _params.zeroForOne
+            ? (-_delta.getSpecifiedDelta(), -_delta.getUnspecifiedDelta())
+            : (-_delta.getUnspecifiedDelta(), -_delta.getSpecifiedDelta());
+
+        // Store our amounts
+        assembly {
+            tstore(_key_amount0, token0)
+            tstore(_key_amount1, token1)
+        }
+    }
+
+    /**
+     * Maps our swap fee to the expected event emit format.
+     *
+     * @param _params The `SwapParams` used to capture the delta
+     * @param _key_fee0 The tstore key for the token0 fee amount
+     * @param _key_fee1 The tstore key for the token1 fee amount
+     * @param _delta The `uint` that is being captured for the fee
+     */
+    function _captureDeltaSwapFee(
+        SwapParams memory _params,
+        bytes32 _key_fee0,
+        bytes32 _key_fee1,
+        uint _delta
+    ) internal {
+        // The delta provided needs to be made negative
+        int delta = -int(_delta);
+
+        if (_params.amountSpecified < 0 == _params.zeroForOne) {
+            assembly {
+                tstore(_key_fee0, 0)
+                tstore(_key_fee1, delta)
+            }
+        } else {
+            assembly {
+                tstore(_key_fee0, delta)
+                tstore(_key_fee1, 0)
+            }
+        }
+    }
+
+
+    /**
+     * Settles tokens against the PoolManager based on the BalanceDelta passed.
+     *
+     * @dev This is required to be separated due to Stack Too Deep errors
+     *
+     * @param _poolKey The pool key to settle against
+     * @param _delta The BalanceDelta showing token amounts to settle
+     */
+    function _settleDelta(PoolKey memory _poolKey, BalanceDelta _delta) internal {
+        if (_delta.amount0() < 0) {
+            _poolKey.currency0.settle(poolManager, address(this), uint(-int(_delta.amount0())), false);
+        } else if (_delta.amount0() > 0) {
+            poolManager.take(_poolKey.currency0, address(this), uint(int(_delta.amount0())));
+        }
+
+        if (_delta.amount1() < 0) {
+            _poolKey.currency1.settle(poolManager, address(this), uint(-int(_delta.amount1())), false);
+        } else if (_delta.amount1() > 0) {
+            poolManager.take(_poolKey.currency1, address(this), uint(int(_delta.amount1())));
+        }
+    }
+
     /**
      * This function should only be called by the `closeBidWall` function to unlock the {PoolManager}
      * interactions for the `{BidWall}.closeBidWall` function.
      *
      * @param _data The encoded {PoolKey} for the `closeBidWall` request
      *
-     * @return bytes Empty data; nothing will be returned
+     * @return result Empty data; nothing will be returned
      */
-    function _unlockCallback(
+    function unlockCallback(
         bytes calldata _data
-    ) internal override returns (bytes memory) {
+    ) internal returns (bytes memory result) {
         bidWall.closeBidWall(abi.decode(_data, (PoolKey)));
+        return result;
+    }
+
+    /**
+     * Helper function to allow for tstore-d variables to be called individually. This saves us
+     * defining an additional variable before our `tload` calls inside the function.
+     *
+     * @param _key The `tstore` key to load
+     *
+     * @return value_ The `int` value in the tstore
+     */
+    function _tload(bytes32 _key) internal view returns (int value_) {
+        assembly { value_ := tload(_key) }
+    }
+
+    /**
+     * Override to return true to make `_initializeOwner` prevent double-initialization.
+     *
+     * @return bool Set to `true` to prevent owner being reinitialized.
+     */
+    function _guardInitializeOwner() internal pure override returns (bool) {
+        return true;
     }
 }

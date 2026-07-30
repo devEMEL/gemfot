@@ -7,7 +7,8 @@ interface IMemecoin is IERC20 {
     function initialize(
         string calldata name_,
         string calldata symbol_,
-        string calldata tokenUri_
+        string calldata tokenUri_,
+        uint totalSupply
     ) external;
 
     function mint(
@@ -34,6 +35,8 @@ interface IMemecoin is IERC20 {
     function symbol() external view returns (string memory);
 
     function tokenURI() external view returns (string memory);
+
+    function totalSupply() external view returns (uint);
 
     function creator() external view returns (address);
 

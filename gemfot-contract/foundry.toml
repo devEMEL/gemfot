@@ -8,6 +8,7 @@ evm_version = "cancun"
 block_gas_limit = 30000000000
 allow_internal_expect_revert = true
 solc_version="0.8.26"
+viaIR = true
 
 fs_permissions = [{access = "read-write", path = ".forge-snapshots/"}]
 
@@ -16,6 +17,10 @@ fs_permissions = [{access = "read-write", path = ".forge-snapshots/"}]
 [rpc_endpoints]
 arc_testnet = "https://arc-testnet.drpc.org"
 base_sepolia = "${BASE_SEPOLIA_RPC_URL}"
+
+[lint]
+exclude_lints = ["block-timestamp", "unsafe-typecast", "divide-before-multiply"]
+
 
 [fmt]
 single_line_statement_blocks = "multi"

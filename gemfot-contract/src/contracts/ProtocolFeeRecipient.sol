@@ -55,7 +55,7 @@ contract ProtocolFeeRecipient is Ownable {
     ) public onlyOwner returns (uint amount_) {
         // Withdraw fees from FeeEscrow
         for (uint i; i < _feeEscrows.length(); ++i) {
-            IFeeEscrow(payable(_feeEscrows.at(i))).withdrawFees(address(this), true);
+            IFeeEscrow(payable(_feeEscrows.at(i))).withdrawFees(address(this));
         }
 
         // Find the total amount being claimed by capturing the current ETH balance
@@ -83,7 +83,7 @@ contract ProtocolFeeRecipient is Ownable {
             emit FeeEscrowUpdated(_feeEscrow, true);
         } else if (!_enable && _feeEscrows.contains(_feeEscrow)) {
             // Withdraw fees before removing
-            IFeeEscrow(payable(_feeEscrow)).withdrawFees(address(this), true);
+            IFeeEscrow(payable(_feeEscrow)).withdrawFees(address(this));
 
             _feeEscrows.remove(_feeEscrow);
             emit FeeEscrowUpdated(_feeEscrow, false);

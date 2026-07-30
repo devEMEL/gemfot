@@ -25,8 +25,8 @@ contract FeeExemptions is Ownable {
     /**
      * Defines the fee exemption that a beneficiary will receive if enabled.
      *
-     * @member flatFee The flat fee value that the `_beneficiary` will receive
-     * @member enabled If the exemption is enabled
+     * @custom:member flatFee The flat fee value that the `_beneficiary` will receive
+     * @custom:member enabled If the exemption is enabled
      */
     struct FeeExemption {
         uint24 flatFee;

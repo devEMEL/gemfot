@@ -13,6 +13,8 @@ import {FeeExemptions} from "@gemfot/hooks/FeeExemptions.sol";
 import {MemecoinFinder} from "@gemfot/types/MemecoinFinder.sol";
 
 import {IFeeCalculator} from "@gemfot-interfaces/IFeeCalculator.sol";
+import {SwapParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * This hook will allow our pools to have a range of fee distribution approaches. This will
@@ -52,9 +54,9 @@ abstract contract FeeDistributor is Ownable {
      *
      * `Fee priority: swapfee -> referrer (excluded) -> protocol -> creator -> bidwall`
      *
-     * @member swapFee The amount of the transaction taken as fee
-     * @member protocol The percentage that the protocol will receive
-     * @member active If a FeeDistribution struct has been set for the mapping
+     * @custom:member swapFee The amount of the transaction taken as fee
+     * @custom:member protocol The percentage that the protocol will receive
+     * @custom:member active If a FeeDistribution struct has been set for the mapping
      */
     struct FeeDistribution {
         uint24 swapFee;
@@ -135,9 +137,9 @@ abstract contract FeeDistributor is Ownable {
         uint _amount
     ) internal {
         // set allowance so that `feeEscrow` can pull the fees
-        // if (IFLETH(nativeToken).allowance(msg.sender, address(feeEscrow)) < _amount) {
-        //     IFLETH(nativeToken).approve(address(feeEscrow), type(uint).max);
-        // }
+        if (IERC20(nativeToken).allowance(msg.sender, address(feeEscrow)) < _amount) {
+            IERC20(nativeToken).approve(address(feeEscrow), type(uint).max);
+        }
 
         // allocate the fees in the escrow
         feeEscrow.allocateFees(_poolId, _recipient, _amount);
@@ -159,7 +161,7 @@ abstract contract FeeDistributor is Ownable {
     function _captureSwapFees(
         IPoolManager _poolManager,
         PoolKey calldata _key,
-        IPoolManager.SwapParams memory _params,
+        SwapParams memory _params,
         IFeeCalculator _feeCalculator,
         Currency _swapFeeCurrency,
         uint _swapAmount,

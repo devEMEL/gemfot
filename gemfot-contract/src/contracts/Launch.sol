@@ -5,13 +5,13 @@ import {ILaunch} from "@gemfot-interfaces/ILaunch.sol";
 import {IMemecoin} from "@gemfot-interfaces/IMemecoin.sol";
 import {GemFotManager} from "@gemfot/GemFotManager.sol";
 import {TokenSupply} from "@gemfot/libraries/TokenSupply.sol";
+import {MarketCappedPriceParams} from "@gemfot/types/USDCMarketCappedPrice.sol";
 import {Ownable} from "@solady/auth/Ownable.sol";
 import {ERC721} from "@solady/tokens/ERC721.sol";
 import {Initializable} from "@solady/utils/Initializable.sol";
 import {LibClone} from "@solady/utils/LibClone.sol";
 import {LibString} from "@solady/utils/LibString.sol";
 import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
-
 /**
  * The Launch ERC721 NFT that is created when a new position is by the {PositionManager} launched.
  * This is used to prove ownership of a pool, so transferring this token would result in a new
@@ -33,16 +33,13 @@ contract Launch is ERC721, ILaunch, Initializable, Ownable {
     /**
      * Stores related memecoin contract implementation addresses.
      *
-     * @member memecoin The ERC20 {Memecoin} address
-     * @member memecoinTreasury The {MemecoinTreasury} address
+     * @custom:member memecoin The ERC20 {Memecoin} address
+     * @custom:member memecoinTreasury The {MemecoinTreasury} address
      */
     struct TokenInfo {
         address memecoin;
         address payable memecoinTreasury;
     }
-
-    /// The maximum amount of tokens that can be attributed to the Fair Launch
-    uint public constant MAX_FAIR_LAUNCH_TOKENS = TokenSupply.INITIAL_SUPPLY;
 
     /// The maximum value of a creator's fee allocation
     uint public constant MAX_CREATOR_ALLOCATION = 100_00;
@@ -112,13 +109,15 @@ contract Launch is ERC721, ILaunch, Initializable, Ownable {
         onlyGemFotManager
         returns (address memecoin_, address payable memecoinTreasury_, uint tokenId_)
     {
+        (MarketCappedPriceParams memory params) = abi.decode(_params.initialPriceParams, (MarketCappedPriceParams));
+
         // Check if the launch timestamp surpasses the max schedule duration
         if (_params.launchAt > block.timestamp + MAX_SCHEDULE_DURATION) {
             revert InvalidLaunchSchedule();
         }
 
         // Ensure that the initial supply falls within an accepted range
-        if (_params.initialTokenFairLaunch > MAX_FAIR_LAUNCH_TOKENS) {
+        if (_params.initialTokenFairLaunch > params.totalSupply) {
             revert InvalidInitialSupply(_params.initialTokenFairLaunch);
         }
 
@@ -149,7 +148,7 @@ contract Launch is ERC721, ILaunch, Initializable, Ownable {
 
         // Initialize the memecoin with the metadata
         IMemecoin _memecoin = IMemecoin(memecoin_);
-        _memecoin.initialize(_params.name, _params.symbol, _params.tokenUri);
+        _memecoin.initialize(_params.name, _params.symbol, _params.tokenUri, params.totalSupply);
 
         // Deploy the memecoin treasury
         memecoinTreasury_ = payable(LibClone.cloneDeterministic(memecoinTreasuryImplementation, bytes32(tokenId_)));
@@ -158,20 +157,7 @@ contract Launch is ERC721, ILaunch, Initializable, Ownable {
         tokenInfo[tokenId_] = TokenInfo(memecoin_, memecoinTreasury_);
 
         // Mint our initial supply to the {GemFotManager}
-        _memecoin.mint(address(gemfotManager), TokenSupply.INITIAL_SUPPLY);
-    }
-
-    /**
-     * Helper to show the {Memecoin} address for the ERC721.
-     *
-     * @param _tokenId The token ID to get the {Memecoin} for
-     *
-     * @return address {Memecoin} address
-     */
-    function memecoin(
-        uint _tokenId
-    ) public view returns (address) {
-        return tokenInfo[_tokenId].memecoin;
+        _memecoin.mint(address(gemfotManager), params.totalSupply);
     }
 
     /**
@@ -185,6 +171,19 @@ contract Launch is ERC721, ILaunch, Initializable, Ownable {
         uint _tokenId
     ) public view returns (PoolId) {
         return gemfotManager.poolKey(tokenInfo[_tokenId].memecoin).toId();
+    }
+
+    /**
+     * Helper to show the {Memecoin} address for the ERC721.
+     *
+     * @param _tokenId The token ID to get the {Memecoin} for
+     *
+     * @return address {Memecoin} address
+     */
+    function memecoin(
+        uint _tokenId
+    ) public view returns (address) {
+        return tokenInfo[_tokenId].memecoin;
     }
 
     /**

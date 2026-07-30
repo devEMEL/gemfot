@@ -14,9 +14,10 @@ import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {LiquidityAmounts} from "@uniswap/v4-core/test/utils/LiquidityAmounts.sol";
 
-import {CurrencySettler} from "@gemfot/libraries/CurrencySettler.sol";
 import {ProtocolRoles} from "@gemfot/libraries/ProtocolRoles.sol";
 import {TickFinder} from "@gemfot/types/TickFinder.sol";
+import {ModifyLiquidityParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
+import {CurrencySettler} from "@uniswap/v4-core/test/utils/CurrencySettler.sol";
 
 /**
  * Adds functionality to the {PositionManager} that promotes a fair token launch.
@@ -42,7 +43,7 @@ contract FairLaunch is AccessControl {
     error NotPositionManager();
 
     /// Emitted when a Fair Launch position is created
-    event FairLaunchCreated(PoolId indexed _poolId, uint _tokens, uint _startsAt, uint _endsAt);
+    event FairLaunchCreated(PoolId indexed _poolId, uint _tokens, uint _tokenTotalSupply, uint _startsAt, uint _endsAt);
 
     /// Emitted when a Fair Launch is ended and rebalanced
     event FairLaunchEnded(PoolId indexed _poolId, uint _revenue, uint _supply, uint _endedAt);
@@ -50,12 +51,12 @@ contract FairLaunch is AccessControl {
     /**
      * Holds FairLaunch information for a Pool.
      *
-     * @member startsAt The unix timestamp that the FairLaunch window starts
-     * @member endsAt The unix timestamp that the FairLaunch window ends
-     * @member initialTick The tick that the FairLaunch position was created at
-     * @member revenue The amount of revenue earned by the FairLaunch position
-     * @member supply The amount of supply in the FairLaunch
-     * @member closed If the FairLaunch has been closed
+     * @custom:member startsAt The unix timestamp that the FairLaunch window starts
+     * @custom:member endsAt The unix timestamp that the FairLaunch window ends
+     * @custom:member initialTick The tick that the FairLaunch position was created at
+     * @custom:member revenue The amount of revenue earned by the FairLaunch position
+     * @custom:member supply The amount of supply in the FairLaunch
+     * @custom:member closed If the FairLaunch has been closed
      */
     struct FairLaunchInfo {
         uint startsAt;
@@ -63,6 +64,7 @@ contract FairLaunch is AccessControl {
         int24 initialTick;
         uint revenue;
         uint supply;
+        uint totalSupply;
         bool closed;
     }
 
@@ -124,6 +126,7 @@ contract FairLaunch is AccessControl {
         int24 _initialTick,
         uint _launchesAt,
         uint _initialTokenFairLaunch,
+        uint _tokenTotalSupply,
         uint _fairLaunchDuration
     ) public virtual onlyPositionManager returns (FairLaunchInfo memory) {
         // If we have no initial tokens, then we need to overwrite our fair launch duration to zero
@@ -142,10 +145,11 @@ contract FairLaunch is AccessControl {
             initialTick: _initialTick,
             revenue: 0,
             supply: _initialTokenFairLaunch,
+            totalSupply: _tokenTotalSupply,
             closed: false
         });
 
-        emit FairLaunchCreated(_poolId, _initialTokenFairLaunch, _launchesAt, endsAt);
+        emit FairLaunchCreated(_poolId, _initialTokenFairLaunch, _tokenTotalSupply, _launchesAt, endsAt);
         return _fairLaunchInfo[_poolId];
     }
 
@@ -362,7 +366,7 @@ contract FairLaunch is AccessControl {
         // Create our single-sided position
         (BalanceDelta delta,) = poolManager.modifyLiquidity({
             key: _poolKey,
-            params: IPoolManager.ModifyLiquidityParams({
+            params: ModifyLiquidityParams({
                 tickLower: _tickLower, tickUpper: _tickUpper, liquidityDelta: liquidityDelta.toInt128(), salt: ""
             }),
             hookData: ""

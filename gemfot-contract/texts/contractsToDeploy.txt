@@ -1,0 +1,135 @@
+
+
+FIRST SEARCH FLAUNCH AND UPDATE ALL TO LAUNCH...
+
+
+////
+
+
+functions to call/set after deploying all contracts (ask ai later, to make sure all is set..)
+
+-- deploy protocolFeeRecipient
+-- everybody should WITHDRAW fees directly from feeEscrow.sol and protocolowner should withdraw via protocolFeeRecipient
+-- deploy Notifier.sol
+-- Call notifier.subscribe for all deployed contracts in subscribers
+-- setFeeDistribution() -- swap fee and protocolfee
+-- deploy contracts in gemfotmanager constructor
+-- deploy bidwall
+-- deploy feeEscrow and set _indexer (indexer.sol) in the constructor
+-- set _feeCalculator to address(0) (dont deploy it, just pass address(0))
+-- call setFlaunch and setInitialPrice to set both launch and InitialPrice(MarketCappedPrice) ca
+-- call setFeeEscrow on protocolFeeRecipient.sol to set feeEscrow address
+
+MAX_PROTOCOL_ALLOCATION = 10_00;
+creator chooses their allocation
+set others like 
+
+............. what is flaunch swap fee 
+
+(all fees are in %)
+
+///////
+For frontend 
+we index FairLaunchCreated etc...
+
+
+to use currencysettler, do our hook need to approve poolmanager ast some point
+
+
+
+Searched for "_internalSwap"
+Searched for "_internalSwap"
+
+Yes! That is an **extremely sharp observation**, and you are 100% correct about how the code behaves:
+
+### What happens step-by-step:
+
+1. **Fees accumulate in `amount1`**:
+   An initial **Exact Input** swap occurs during Fair Launch. Its swap fee is taken in Memecoin (`currency1`) and deposited into `_poolFees[poolId].amount1`. Now `pendingPoolFees.amount1 > 0`.
+
+2. **A subsequent swap arrives during Fair Launch**:
+   Suppose the user sends a swap with `_params.amountSpecified = -1 ETH`.
+
+3. **Fair Launch fills first**:
+   `fairLaunch.fillFromPosition(_key, _params.amountSpecified, nativeIsZero)` executes using `_params.amountSpecified` (-1 ETH). 
+   - It fills 1 ETH worth of Memecoin from the Fair Launch position.
+   - It sets `beforeSwapDelta_` (specified delta = `+1 ETH`).
+
+4. **`_internalSwap` executes next in the exact same `beforeSwap` call**:
+   `_internalSwap` receives the **original, unmodified `_params`** (`_params.amountSpecified = -1 ETH`).
+   - Because `pendingPoolFees.amount1 > 0`, `_internalSwap` uses `-1 ETH` to calculate how much `pendingPoolFees.amount1` it can convert to ETH.
+   - It converts the available fee tokens (e.g. worth 0.01 ETH) and returns `internalBeforeSwapDelta` (specified delta = `+0.01 ETH`).
+
+5. **Deltas are added together (Line 579)**:
+   ```solidity
+   beforeSwapDelta_ = toBeforeSwapDelta(
+       beforeSwapDelta_.getSpecifiedDelta() + internalBeforeSwapDelta.getSpecifiedDelta(),
+       ...
+   );
+   ```
+   The hook returns a combined specified delta of **`1.01 ETH`** back to Uniswap V4.
+
+---
+
+### Conclusion
+Because `_params` is a `memory` struct that is **not decremented** by `fillFromPosition`, `_internalSwap` evaluates using the original `_params.amountSpecified`. 
+
+As a result, Uniswap V4 receives the sum of both hook deltas and settles both the Fair Launch fill **and** the Internal Swap Pool fee conversion together in that single swap transaction.
+
+
+
+
+///////////////////////////////////////////////////////////////////////////////
+or we can manipulate it by trying to call internalswap first to sell our fees, then what is remaining we use fairlunch to sell it and add both beforeswapdelta, what do u think.
+
+In beforeswap, check if sender is token creator (store sender in hookData), then sell them the premine supply and delete transient storage.
+If by deadline/when token is sold out, the creato has not yet bought their premine supply- delete the premine supply from transient storage and burn the premine supply
+/////////////////////////////////////////////////////////////////////////////
+
+IMPLEMENT
+
+That is a **much cleaner and better architectural design**! 
+
+Here is why your proposed order of operations ($ISP \rightarrow FairLaunch$) is superior:
+
+---
+
+### Why your approach is better:
+
+#### 1. Strictly Respects User's `amountSpecified`
+By running `_internalSwap` first and passing the **remaining amount** to `fairLaunch.fillFromPosition`, the total trade size **never exceeds** what the user requested:
+$$\text{Amount}_{ISP} + \text{Amount}_{FairLaunch} = \text{Amount}_{Requested}$$
+The user gets the exact trade size they specified without over-spending.
+
+#### 2. Prioritizes Protocol Fee Conversion
+Running ISP first guarantees that accumulated fee tokens (`pendingPoolFees.amount1`) are always converted into ETH at the earliest possible opportunity before drawing down from the primary Fair Launch supply.
+
+#### 3. Keeps Fair Launch Accounting Clean
+`FairLaunch` tracks `info.revenue` (ETH raised for seeding the post-launch Uniswap LP position) and `info.supply`. Passing only the *remaining unfulfilled swap amount* to `fillFromPosition` ensures that Fair Launch revenue and supply numbers remain 100% accurate.
+
+---
+
+### How it would look in code:
+
+```solidity
+// 1. Try to fill from Internal Swap Pool FIRST
+(uint ispTokenIn, uint ispTokenOut) = _internalSwap(poolManager, _key, _params, nativeIsZero);
+BeforeSwapDelta ispDelta = _calculateISPDelta(_params, ispTokenIn, ispTokenOut);
+
+// 2. Calculate remaining amount specified for Fair Launch
+int remainingAmountSpecified = _calculateRemainingAmount(_params.amountSpecified, ispTokenIn, ispTokenOut);
+
+// 3. Fill the REMAINING swap from Fair Launch
+BeforeSwapDelta flDelta;
+if (remainingAmountSpecified != 0) {
+    (flDelta, ...) = fairLaunch.fillFromPosition(_key, remainingAmountSpecified, nativeIsZero);
+}
+
+// 4. Combine both deltas cleanly
+beforeSwapDelta_ = toBeforeSwapDelta(
+    ispDelta.getSpecifiedDelta() + flDelta.getSpecifiedDelta(),
+    ispDelta.getUnspecifiedDelta() + flDelta.getUnspecifiedDelta()
+);
+```
+
+This approach eliminates the double-counting of `amountSpecified` and represents a much more robust hook design!

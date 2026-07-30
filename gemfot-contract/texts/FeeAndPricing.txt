@@ -1,4 +1,103 @@
+where is the fee distribution % shared for creator, referral, protocol, bidwall
 
+
+The fee distribution follows a **Waterfall Model**:
+
+$$\text{Total Swap Fee} \longrightarrow \text{Referrer} \longrightarrow \text{Protocol} \longrightarrow \text{Creator} \longrightarrow \text{BidWall (Remainder)}$$
+
+Here is where each share is calculated and distributed in the codebase:
+
+---
+
+### 1. Referrer Fee (Immediate First Cut)
+* **Code Location**: `FeeDistributor.sol` lines 226–268 (`_distributeReferrerFees`)
+* **Calculation**:
+  ```solidity
+  referrerFee_ = _swapFee * feeDistribution.referrer / 100_00;
+  ```
+* **Distribution**: Deducted immediately during the swap in `_captureAndDepositFees()`. Sent directly to the referrer or deposited into `referralEscrow`.
+
+---
+
+### 2. Protocol, Creator & BidWall Fees (`feeSplit`)
+* **Code Location**: `FeeDistributor.sol` lines 282–301 (`feeSplit`) and `PositionManager.sol` lines 931–1002 (`_distributeFees`)
+* Triggered in `afterSwap()` whenever accumulated ETH fees exceed `0.001 ETH`:
+
+#### A. Protocol Share
+```solidity
+protocol_ = _amount * _poolFeeDistribution.protocol / 100_00;
+_amount -= protocol_;
+```
+* **Distribution**: Allocated to `protocolFeeRecipient` via `feeEscrow.allocateFees()`.
+
+#### B. Creator Share
+```solidity
+creator_ = _amount * creatorFee[poolId] / 100_00;
+_amount -= creator_;
+```
+* **Distribution**: Allocated to the current holder of the collection NFT (`poolCreator`) via `feeEscrow.allocateFees()`.
+
+#### C. BidWall Share (Remainder)
+```solidity
+bidWall_ = _amount; // Remaining balance
+```
+* **Distribution**: Automatically deposited directly into `bidWall.deposit()` to support liquidity floor bids. (If BidWall is disabled, it routes to `memecoin.treasury()`).
+
+
+
+
+////////////////////////////////////////////
+
+i mean where is the fee distribution % set for creator, referral, protocol, bidwall
+
+
+
+
+Searched for "creatorFee"
+Viewed FeeDistributor.sol:315-360
+Viewed FeeDistributor.sol:400-467
+
+Here is where each percentage is set in the codebase:
+
+---
+
+### 1. Creator Fee % (`creatorFee`)
+Set **per pool at token creation** in `PositionManager.sol` (line 251):
+```solidity
+if (_params.creatorFeeAllocation != 0) {
+    creatorFee[poolId] = _params.creatorFeeAllocation;
+}
+```
+When calling `PositionManager.flaunch()`, the creator specifies `creatorFeeAllocation` inside the `FlaunchParams` struct.
+
+---
+
+### 2. Referrer Fee % & Protocol Fee %
+Managed via the **`FeeDistribution` struct** in `FeeDistributor.sol`:
+
+```solidity
+struct FeeDistribution {
+    uint24 swapFee;   // Total swap fee % (e.g. 100 = 1%)
+    uint24 referrer;  // Referrer share %
+    uint24 protocol;  // Protocol share %
+    bool active;
+}
+```
+
+* **Global Defaults**: Initialized in `FeeDistributor.sol` constructor.
+* **Global Updates**: Updated by the contract owner via `setFeeDistribution()` (line 319).
+* **Protocol Fee Updates**: Updated specifically by `$FLAY` governance via `setProtocolFeeDistribution()` (line 332).
+* **Per-Pool Overrides**: Updated by the contract owner via `setPoolFeeDistribution(poolId, ...)` (line 354).
+
+---
+
+### 3. BidWall Fee %
+The BidWall **does not have a set percentage** because it receives the **implicit remainder**:
+```solidity
+bidWall_ = _amount; // Whatever is left after protocol and creator splits
+```
+
+////////////////////////////////////////////
 
 Here is the breakdown of the calculations and numbers based on the creator's parameters:
 

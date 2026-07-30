@@ -7,6 +7,7 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import {SafeTransferLib} from "@solady/utils/SafeTransferLib.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {Hooks, IHooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
@@ -18,12 +19,13 @@ import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {LiquidityAmounts} from "@uniswap/v4-core/test/utils/LiquidityAmounts.sol";
 
 import {GemFotManager} from "@gemfot/GemFotManager.sol";
-import {CurrencySettler} from "@gemfot/libraries/CurrencySettler.sol";
 import {ProtocolRoles} from "@gemfot/libraries/ProtocolRoles.sol";
 import {MemecoinFinder} from "@gemfot/types/MemecoinFinder.sol";
 import {TickFinder} from "@gemfot/types/TickFinder.sol";
+import {CurrencySettler} from "@uniswap/v4-core/test/utils/CurrencySettler.sol";
 
 import {IMemecoin} from "@gemfot-interfaces/IMemecoin.sol";
+import {ModifyLiquidityParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
 
 /**
  * This hook allows us to create a single sided liquidity position (Plunge Protection) that is
@@ -40,6 +42,7 @@ contract BidWall is AccessControl, Ownable {
     using StateLibrary for IPoolManager;
     using TickFinder for int24;
     using MemecoinFinder for PoolKey;
+    using SafeTransferLib for address;
 
     error CallerIsNotCreator();
     error NotPositionManager();
@@ -71,12 +74,13 @@ contract BidWall is AccessControl, Ownable {
     /**
      * Stores the BidWall information for a specific pool.
      *
-     * @member disabled If the BidWall is disabled for the pool
-     * @member initialized If the BidWall has been initialized
-     * @member tickLower The current lower tick of the BidWall
-     * @member tickUpper The current upper tick of the BidWall
-     * @member pendingUSDCFees The amount of USDC fees waiting to be put into the BidWall until threshold is crossed
-     * @member cumulativeSwapFees The total amount of swap fees accumulated for the pool
+     * @custom:member disabled If the BidWall is disabled for the pool
+     * @custom:member initialized If the BidWall has been initialized
+     * @custom:member tickLower The current lower tick of the BidWall
+     * @custom:member tickUpper The current upper tick of the BidWall
+     * @custom:member pendingUSDCFees The amount of USDC fees waiting to be put into the BidWall until threshold is
+     * crossed
+     * @custom:member cumulativeSwapFees The total amount of swap fees accumulated for the pool
      */
     struct PoolInfo {
         bool disabled;
@@ -258,7 +262,7 @@ contract BidWall is AccessControl, Ownable {
             // Send the received USDC to the {PositionManager}, as that will be supplying the USDC
             // tokens to create the new position.
             if (usdcWithdrawn != 0) {
-                IERC20(nativeToken).transfer(msg.sender, usdcWithdrawn);
+                nativeToken.safeTransfer(msg.sender, usdcWithdrawn);
             }
         } else {
             // If this is the first time we are adding liquidity, then we can set our
@@ -306,7 +310,8 @@ contract BidWall is AccessControl, Ownable {
             address memecoinTreasury = _getMemecoinTreasury(_poolKey, memecoin);
 
             // Transfer the tokens to the memecoin treasury
-            IERC20(memecoin).transfer(memecoinTreasury, memecoinWithdrawn);
+            memecoin.safeTransfer(memecoinTreasury, memecoinWithdrawn);
+
             emit BidWallRewardsTransferred(poolId, memecoinTreasury, memecoinWithdrawn);
         }
 
@@ -432,18 +437,18 @@ contract BidWall is AccessControl, Ownable {
         // Pending USDC fees are stored in the {PositionManager}. So if we have a value there, then we
         // will need to transfer this from the {PositionManager}, rather than this contract.
         if (pendingUSDCFees != 0) {
-            IERC20(nativeToken).transferFrom(msg.sender, memecoinTreasury, pendingUSDCFees);
+            nativeToken.safeTransferFrom(msg.sender, memecoinTreasury, pendingUSDCFees);
         }
 
         // Transfer USDC withdrawn from the legacy position to the governance contract. We Avoid using
         // safe transfer as this could brick calls if a malicious governance was set by the token.
         if (usdcWithdrawn != 0) {
-            IERC20(nativeToken).transfer(memecoinTreasury, usdcWithdrawn);
+            nativeToken.safeTransfer(memecoinTreasury, usdcWithdrawn);
         }
 
         // Transfer the flTokens withdrawn from the legacy position to the governance contract
         if (memecoinWithdrawn != 0) {
-            IERC20(memecoin).transfer(memecoinTreasury, memecoinWithdrawn);
+            memecoin.safeTransfer(memecoinTreasury, memecoinWithdrawn);
             emit BidWallRewardsTransferred(poolId, memecoinTreasury, memecoinWithdrawn);
         }
 
@@ -641,7 +646,7 @@ contract BidWall is AccessControl, Ownable {
     ) internal returns (BalanceDelta delta_) {
         (delta_,) = poolManager.modifyLiquidity({
             key: _poolKey,
-            params: IPoolManager.ModifyLiquidityParams({
+            params: ModifyLiquidityParams({
                 tickLower: _tickLower, tickUpper: _tickUpper, liquidityDelta: _liquidityDelta, salt: "bidwall"
             }),
             hookData: ""

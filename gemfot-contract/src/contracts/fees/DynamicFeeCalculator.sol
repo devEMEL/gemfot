@@ -7,6 +7,7 @@ import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 
 import {IFeeCalculator} from "@gemfot-interfaces/IFeeCalculator.sol";
+import {SwapParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
 
 /**
  * Calculates the fee to be paid for a swap based on the amount of volume being transacted in
@@ -56,11 +57,11 @@ contract DynamicFeeCalculator is IFeeCalculator {
      * @dev We could pack this struct more tightly around the timestamp, but this would
      * have an offset cost in coversion logic that may not make it beneficial.
      *
-     * @member token1SoFar The current aggregated swap volume for which no fee
+     * @custom:member token1SoFar The current aggregated swap volume for which no fee
      * increase has yet been accounted for.
-     * @member lastFeeDecreaseTime The last time the fee was decreased, represented
+     * @custom:member lastFeeDecreaseTime The last time the fee was decreased, represented
      * in unixtime.
-     * @member currentFee The current fee that is used to charge swappers.
+     * @custom:member currentFee The current fee that is used to charge swappers.
      */
     struct PoolInfo {
         uint24 currentFee;
@@ -69,24 +70,24 @@ contract DynamicFeeCalculator is IFeeCalculator {
     }
 
     /// Thrown when `trackSwap` is called by unauthorized address
-    error CallerNotPositionManager();
+    error CallerNotGemFotManager();
 
     /// Maps our `PoolInfo` to each pool
     mapping(PoolId _poolId => PoolInfo _poolInfo) public poolInfos;
 
-    /// The {PositionManager} contract address
-    address public immutable positionManager;
+    /// The {GemFotManager} contract address
+    address public immutable gemfotManager;
 
     /**
-     * Assigns our {PositionManager} address to ensure that `trackSwap` is only called
+     * Assigns our {GemFotManager} address to ensure that `trackSwap` is only called
      * by approved sources.
      *
-     * @param _positionManager The address of our {PositionManager} contract
+     * @param _gemfotManager The address of our {GemFotManager} contract
      */
     constructor(
-        address _positionManager
+        address _gemfotManager
     ) {
-        positionManager = _positionManager;
+        gemfotManager = _gemfotManager;
     }
 
     /**
@@ -102,7 +103,7 @@ contract DynamicFeeCalculator is IFeeCalculator {
      */
     function determineSwapFee(
         PoolKey memory _poolKey,
-        IPoolManager.SwapParams memory,
+        SwapParams memory,
         /* _params */
         uint24 _baseFee
     ) public view returns (uint24 swapFee_) {
@@ -128,14 +129,14 @@ contract DynamicFeeCalculator is IFeeCalculator {
         address,
         /* _sender */
         PoolKey calldata _key,
-        IPoolManager.SwapParams calldata,
+        SwapParams calldata,
         /* _params */
         BalanceDelta _delta,
         bytes calldata /* _hookData */
     ) public {
-        // Ensure that this call is coming from the {PositionManager}
-        if (msg.sender != positionManager) {
-            revert CallerNotPositionManager();
+        // Ensure that this call is coming from the {GemFotManager}
+        if (msg.sender != gemfotManager) {
+            revert CallerNotGemFotManager();
         }
 
         PoolId poolId = _key.toId();
