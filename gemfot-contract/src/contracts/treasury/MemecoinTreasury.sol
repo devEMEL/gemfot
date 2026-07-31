@@ -29,7 +29,7 @@ contract MemecoinTreasury is Initializable, ReentrancyGuard {
 
     event ActionExecuted(address indexed _action, PoolKey _poolKey, bytes _data);
 
-    /// The native token used by the Launch {PositionManager}
+    /// The native token used by the Launch {GemFotManager}
     address public nativeToken;
 
     /// The {TreasuryActionManager} contract that stores approved actions
@@ -42,7 +42,7 @@ contract MemecoinTreasury is Initializable, ReentrancyGuard {
     PoolKey public poolKey;
 
     /**
-     * Sets the Launch {PositionManager} and native token, and initializes with the `PoolKey`.
+     * Sets the Launch {GemFotManager} and native token, and initializes with the `PoolKey`.
      *
      * @param _actionManager The {TreasuryActionManager} contract address
      * @param _nativeToken The native token address used by Launch

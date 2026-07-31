@@ -7,5 +7,5 @@ pragma solidity ^0.8.26;
 library ProtocolRoles {
     bytes32 public constant LAUNCH = keccak256("Launch");
     bytes32 public constant NOTIFIER = keccak256("Notifier");
-    bytes32 public constant POSITION_MANAGER = keccak256("PositionManager");
+    bytes32 public constant GEMFOT_MANAGER = keccak256("GemFotManager");
 }

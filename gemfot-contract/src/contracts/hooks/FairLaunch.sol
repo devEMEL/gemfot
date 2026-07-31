@@ -20,7 +20,7 @@ import {ModifyLiquidityParams} from "@uniswap/v4-core/src/types/PoolOperation.so
 import {CurrencySettler} from "@uniswap/v4-core/test/utils/CurrencySettler.sol";
 
 /**
- * Adds functionality to the {PositionManager} that promotes a fair token launch.
+ * Adds functionality to the {GemFotManager} that promotes a fair token launch.
  *
  * This creates a time window right after the token is launched that keeps the token at
  * the same price in a single tick position. Fees earned from this are kept within the
@@ -40,7 +40,7 @@ contract FairLaunch is AccessControl {
 
     error CannotModifyLiquidityDuringFairLaunch();
     error CannotSellTokenDuringFairLaunch();
-    error NotPositionManager();
+    error NotGemFotManager();
 
     /// Emitted when a Fair Launch position is created
     event FairLaunchCreated(PoolId indexed _poolId, uint _tokens, uint _tokenTotalSupply, uint _startsAt, uint _endsAt);
@@ -128,7 +128,7 @@ contract FairLaunch is AccessControl {
         uint _initialTokenFairLaunch,
         uint _tokenTotalSupply,
         uint _fairLaunchDuration
-    ) public virtual onlyPositionManager returns (FairLaunchInfo memory) {
+    ) public virtual onlyGemFotManager returns (FairLaunchInfo memory) {
         // If we have no initial tokens, then we need to overwrite our fair launch duration to zero
         if (_initialTokenFairLaunch == 0) {
             _fairLaunchDuration = 0;
@@ -159,14 +159,14 @@ contract FairLaunch is AccessControl {
      * Fair Launch. Any unsold tokens from the Fair Launch will be burned.
      *
      * @param _poolKey The PoolKey we are closing the FairLaunch position of
-     * @param _tokenFees The amount of token fees that need to remain in the {PositionManager}
+     * @param _tokenFees The amount of token fees that need to remain in the {GemFotManager}
      * @param _nativeIsZero If our native token is `currency0`
      */
     function closePosition(
         PoolKey memory _poolKey,
         uint _tokenFees,
         bool _nativeIsZero
-    ) public onlyPositionManager returns (FairLaunchInfo memory) {
+    ) public onlyGemFotManager returns (FairLaunchInfo memory) {
         // Reference the pool's FairLaunchInfo, ready to store updated values
         FairLaunchInfo storage info = _fairLaunchInfo[_poolKey.toId()];
 
@@ -179,7 +179,7 @@ contract FairLaunch is AccessControl {
             tickUpper = tickLower + TickFinder.TICK_SPACING;
             _createImmutablePosition(_poolKey, tickLower, tickUpper, info.revenue, true);
 
-            // memecoin position (unsold fair launch supply gets burned in PositionManager)
+            // memecoin position (unsold fair launch supply gets burned in GemFotManager)
             tickLower = TickFinder.MIN_TICK;
             tickUpper = (info.initialTick - 1).validTick(true);
             _createImmutablePosition(
@@ -195,7 +195,7 @@ contract FairLaunch is AccessControl {
             tickLower = tickUpper - TickFinder.TICK_SPACING;
             _createImmutablePosition(_poolKey, tickLower, tickUpper, info.revenue, false);
 
-            // memecoin position (unsold fair launch supply gets burned in PositionManager)
+            // memecoin position (unsold fair launch supply gets burned in GemFotManager)
             tickLower = (info.initialTick + 1).validTick(false);
             tickUpper = TickFinder.MAX_TICK;
             _createImmutablePosition(
@@ -245,7 +245,7 @@ contract FairLaunch is AccessControl {
         bool _nativeIsZero
     )
         public
-        onlyPositionManager
+        onlyGemFotManager
         returns (BeforeSwapDelta beforeSwapDelta_, BalanceDelta balanceDelta_, FairLaunchInfo memory fairLaunchInfo_)
     {
         PoolId poolId = _poolKey.toId();
@@ -312,7 +312,7 @@ contract FairLaunch is AccessControl {
     }
 
     /**
-     * Allows calls from the {PositionManager} to modify the amount of revenue stored against a pool's
+     * Allows calls from the {GemFotManager} to modify the amount of revenue stored against a pool's
      * FairLaunch position. This is required to correctly attribute fees taken.
      *
      * @param _poolId The ID of the PoolKey
@@ -321,7 +321,7 @@ contract FairLaunch is AccessControl {
     function modifyRevenue(
         PoolId _poolId,
         int _revenue
-    ) public onlyPositionManager {
+    ) public onlyGemFotManager {
         if (_revenue < 0) {
             _fairLaunchInfo[_poolId].revenue -= uint(-_revenue);
         } else if (_revenue > 0) {
@@ -418,11 +418,11 @@ contract FairLaunch is AccessControl {
     }
 
     /**
-     * Ensures that only a {PositionManager} can call the function.
+     * Ensures that only a {GemFotManager} can call the function.
      */
-    modifier onlyPositionManager() {
-        if (!hasRole(ProtocolRoles.POSITION_MANAGER, msg.sender)) {
-            revert NotPositionManager();
+    modifier onlyGemFotManager() {
+        if (!hasRole(ProtocolRoles.GEMFOT_MANAGER, msg.sender)) {
+            revert NotGemFotManager();
         }
         _;
     }

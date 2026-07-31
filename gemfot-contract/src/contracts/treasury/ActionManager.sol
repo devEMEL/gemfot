@@ -16,7 +16,7 @@ contract TreasuryActionManager is Ownable {
     /**
      * Sets the contract owner.
      *
-     * @dev This contract should be created in the {PositionManager} constructor call.
+     * @dev This contract should be created in the {GemFotManager} constructor call.
      */
     constructor(
         address _protocolOwner

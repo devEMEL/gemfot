@@ -24,8 +24,8 @@ contract Notifier is Ownable {
     /// Store a list of subscribed contracts
     EnumerableSet.AddressSet internal subscribers;
 
-    /// Store the {PositionManager} that created this contract
-    address internal _positionManager;
+    /// Store the {GemFotManager} that created this contract
+    address internal _gemfotManager;
 
     /**
      * Registers the caller as the contract owner.
@@ -35,7 +35,7 @@ contract Notifier is Ownable {
     constructor(
         address _protocolOwner
     ) {
-        _positionManager = msg.sender;
+        _gemfotManager = msg.sender;
 
         // Grant ownership permissions to the caller
         _initializeOwner(_protocolOwner);
@@ -94,8 +94,8 @@ contract Notifier is Ownable {
         bytes4 _key,
         bytes calldata _data
     ) public {
-        // Ensure that the {PositionManager} sent this notification
-        require(msg.sender == _positionManager);
+        // Ensure that the {GemFotManager} sent this notification
+        require(msg.sender == _gemfotManager);
 
         // Iterate over all subscribers to pass on data
         uint subscribersLength = subscribers.length();

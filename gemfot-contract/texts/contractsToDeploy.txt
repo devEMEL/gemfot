@@ -21,6 +21,11 @@ functions to call/set after deploying all contracts (ask ai later, to make sure 
 -- explain fee distribution well in presentation/slides/whatever (the % structure and which goes to the other if not enabled/valid)
 -- check how to enable bidwall (its used for buyback right?)
 
+
+-- // In your deployment script / setup function:
+contractInstance.grantRole(ProtocolRoles.GEMFOT_MANAGER, gemFotManagerAddress);
+call on both bidwall and fairLaunch (deploy bidwall and fairlaunch too)
+
 -- deploy protocolFeeRecipient
 -- everybody should WITHDRAW fees directly from feeEscrow.sol and protocolowner should withdraw via protocolFeeRecipient
 -- deploy Notifier.sol

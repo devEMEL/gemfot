@@ -45,7 +45,7 @@ contract BidWall is AccessControl, Ownable {
     using SafeTransferLib for address;
 
     error CallerIsNotCreator();
-    error NotPositionManager();
+    error NotGemFotManager();
 
     /// Emitted when the BidWall is first initialised with USDC
     event BidWallInitialized(PoolId indexed _poolId, uint _usdc, int24 _tickLower, int24 _tickUpper);
@@ -112,7 +112,7 @@ contract BidWall is AccessControl, Ownable {
     /**
      * Set up our PoolManager and native USDC token.
      *
-     * @param _nativeToken The USDC token being used in the {PositionManager}
+     * @param _nativeToken The USDC token being used in the {GemFotManager}
      * @param _poolManager The Uniswap V4 {PoolManager}
      * @param _protocolOwner The address of the protocol owner
      */
@@ -167,7 +167,7 @@ contract BidWall is AccessControl, Ownable {
         uint _usdcSwapAmount,
         int24 _currentTick,
         bool _nativeIsZero
-    ) public onlyPositionManager {
+    ) public onlyGemFotManager {
         // If we have no fees to swap, then exit early
         if (_usdcSwapAmount == 0) {
             return;
@@ -208,7 +208,7 @@ contract BidWall is AccessControl, Ownable {
         PoolKey memory _poolKey,
         int24 _currentTick,
         bool _nativeIsZero
-    ) external onlyPositionManager {
+    ) external onlyGemFotManager {
         // If our pool has not fallen stale, then exit early
         PoolId poolId = _poolKey.toId();
         if (lastPoolTransaction[poolId] + staleTimeWindow > block.timestamp) {
@@ -259,7 +259,7 @@ contract BidWall is AccessControl, Ownable {
                 _tickUpper: _poolInfo.tickUpper
             });
 
-            // Send the received USDC to the {PositionManager}, as that will be supplying the USDC
+            // Send the received USDC to the {GemFotManager}, as that will be supplying the USDC
             // tokens to create the new position.
             if (nativeWithdrawn != 0) {
                 nativeToken.safeTransfer(msg.sender, nativeWithdrawn);
@@ -375,7 +375,7 @@ contract BidWall is AccessControl, Ownable {
         }
 
         // If we are disabling our BidWall, then we want to also remove the current liquidity. We
-        // need to send this through the {PositionManager} so that it can open a {PoolManager} lock.
+        // need to send this through the {GemFotManager} so that it can open a {PoolManager} lock.
         if (_disable) {
             GemFotManager(payable(address(_key.hooks))).closeBidWall(_key);
         }
@@ -393,14 +393,14 @@ contract BidWall is AccessControl, Ownable {
      *
      * This call will have been routed in the following way:
      * ```
-     * BidWall.disable -> PositionManager.closeBidWall -> PositionManager.unlockCallback -> BidWall.closeBidwall
+     * BidWall.disable -> GemFotManager.closeBidWall -> GemFotManager.unlockCallback -> BidWall.closeBidwall
      * ```
      *
      * @param _key The PoolKey that we are closing the BidWall of
      */
     function closeBidWall(
         PoolKey memory _key
-    ) external onlyPositionManager {
+    ) external onlyGemFotManager {
         // Unpack information required for our call
         bool nativeIsZero = nativeToken == Currency.unwrap(_key.currency0);
 
@@ -434,8 +434,8 @@ contract BidWall is AccessControl, Ownable {
         address memecoin = address(_key.memecoin(nativeToken));
         address memecoinTreasury = _getMemecoinTreasury(_key, memecoin);
 
-        // Pending USDC fees are stored in the {PositionManager}. So if we have a value there, then we
-        // will need to transfer this from the {PositionManager}, rather than this contract.
+        // Pending USDC fees are stored in the {GemFotManager}. So if we have a value there, then we
+        // will need to transfer this from the {GemFotManager}, rather than this contract.
         if (pendingUSDCFees != 0) {
             nativeToken.safeTransferFrom(msg.sender, memecoinTreasury, pendingUSDCFees);
         }
@@ -627,7 +627,7 @@ contract BidWall is AccessControl, Ownable {
     }
 
     /**
-     * This function will only be called by other functions via the PositionManager, which will already
+     * This function will only be called by other functions via the GemFotManager, which will already
      * hold the Uniswap V4 PoolManager key. It is for this reason we can interact openly with the
      * Uniswap V4 protocol without requiring a separate callback.
      *
@@ -690,11 +690,11 @@ contract BidWall is AccessControl, Ownable {
     }
 
     /**
-     * Ensures that only a {PositionManager} can call the function.
+     * Ensures that only a {GemFotManager} can call the function.
      */
-    modifier onlyPositionManager() {
-        if (!hasRole(ProtocolRoles.POSITION_MANAGER, msg.sender)) {
-            revert NotPositionManager();
+    modifier onlyGemFotManager() {
+        if (!hasRole(ProtocolRoles.GEMFOT_MANAGER, msg.sender)) {
+            revert NotGemFotManager();
         }
         _;
     }

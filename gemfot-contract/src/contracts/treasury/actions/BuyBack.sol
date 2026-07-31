@@ -25,14 +25,14 @@ contract BuyBackAction is ITreasuryAction {
     using SafeTransferLib for address;
 
 
-    /// The native token used by the Launch {PositionManager}
+    /// The native token used by the Launch {GemFotManager}
     Currency public immutable nativeToken;
 
     /// The PoolSwap contract to be used for the buy-back swap
     PoolSwap public immutable poolSwap;
 
     /**
-     * Sets the native token used by the Launch {PositionManager}
+     * Sets the native token used by the Launch {GemFotManager}
      *
      * @param _nativeToken The ERC20 native token
      * @param _poolSwap The PoolSwap contract to action the buy-back swaps

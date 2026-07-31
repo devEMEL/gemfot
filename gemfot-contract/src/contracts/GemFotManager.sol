@@ -200,6 +200,7 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
     /// The contract that handles the FairLaunch flow
     FairLaunch public fairLaunch;
 
+
     /// The contract that handles the token Treasury actions
     TreasuryActionManager public actionManager;
 

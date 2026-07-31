@@ -13,11 +13,11 @@ import {ITreasuryAction} from '@gemfot-interfaces/ITreasuryAction.sol';
  */
 contract BurnTokensAction is ITreasuryAction {
 
-    /// The native token used by the Launch {PositionManager}
+    /// The native token used by the Launch {GemFotManager}
     Currency public immutable nativeToken;
 
     /**
-     * Sets the native token used by the Launch {PositionManager}
+     * Sets the native token used by the Launch {GemFotManager}
      *
      * @param _nativeToken The ERC20 native token
      */
