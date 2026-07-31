@@ -22,7 +22,7 @@ interface IFeeCalculator {
         bytes calldata _hookData
     ) external;
 
-    function setFlaunchParams(
+    function setLaunchParams(
         PoolId _poolId,
         bytes calldata _params
     ) external;

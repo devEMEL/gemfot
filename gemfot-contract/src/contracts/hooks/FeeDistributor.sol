@@ -381,7 +381,7 @@ abstract contract FeeDistributor is Ownable {
         // any custom parameters that have been passed.
         IFeeCalculator fairLaunchCalculator = getFeeCalculator(true);
         if (address(fairLaunchCalculator) != address(0)) {
-            fairLaunchCalculator.setFlaunchParams(_poolId, _feeCalculatorParams);
+            fairLaunchCalculator.setLaunchParams(_poolId, _feeCalculatorParams);
         }
 
         // Check if we have a standard calculator assigned that is different to the fair launch
@@ -389,7 +389,7 @@ abstract contract FeeDistributor is Ownable {
         // passed.
         IFeeCalculator standardCalculator = getFeeCalculator(false);
         if (address(standardCalculator) != address(fairLaunchCalculator)) {
-            standardCalculator.setFlaunchParams(_poolId, _feeCalculatorParams);
+            standardCalculator.setLaunchParams(_poolId, _feeCalculatorParams);
         }
     }
 

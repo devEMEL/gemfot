@@ -4,7 +4,7 @@ pragma solidity ^0.8.26;
 import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
 
 /**
- * Interface that a Subscriber contract should implement to receive updates from the Flaunch
+ * Interface that a Subscriber contract should implement to receive updates from the Launch
  * {Notifier}.
  */
 interface ISubscriber {

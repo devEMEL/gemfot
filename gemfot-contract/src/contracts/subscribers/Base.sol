@@ -11,7 +11,7 @@ import {ISubscriber} from "@gemfot-interfaces/ISubscriber.sol";
 abstract contract BaseSubscriber is ISubscriber {
     error InvalidNotifier(address _sender, address _validNotifier);
 
-    /// The Flaunch {Notifier} contract that will make approved calls
+    /// The Launch {Notifier} contract that will make approved calls
     address public immutable notifier;
 
     /**

@@ -66,11 +66,11 @@ function _reposition(PoolKey memory _poolKey, PoolInfo storage _poolInfo, int24 
 
 ### `_addETHLiquidity` (Internal)
 ```solidity
-function _addETHLiquidity(PoolKey memory _key, bool _nativeIsZero, int24 _currentTick, uint _ethAmount) internal
+function _addETHLiquidity(PoolKey memory _key, bool _nativeIsZero, int24 _currentTick, uint _nativeAmount) internal
 ```
 * **What it does:** 
   1. Identifies the tick directly adjacent to the spot price (`_currentTick + 1` or `_currentTick - 1` depending on pool token order).
-  2. Calculates the exact `liquidityDelta` that the native token amount (`_ethAmount`) can purchase across a single-tick range using Uniswap's `LiquidityAmounts` library.
+  2. Calculates the exact `liquidityDelta` that the native token amount (`_nativeAmount`) can purchase across a single-tick range using Uniswap's `LiquidityAmounts` library.
   3. Deploys the position via `_modifyAndSettleLiquidity`.
   4. Saves the new `tickLower` and `tickUpper` to the pool's state.
 
@@ -136,8 +136,8 @@ Here is the distinction:
 
 ### 1. It supports both `token0` and `token1` as the native asset
 The contract does not assume the native token (ETH/USDC) is always `token0`. It dynamically checks `_nativeIsZero` and handles both configurations:
-* **If Native is `token0` (`_nativeIsZero == true`):** It calculates liquidity using `amount0: _ethAmount` via `getLiquidityForAmount0`.
-* **If Native is `token1` (`_nativeIsZero == false`):** It calculates liquidity using `amount1: _ethAmount` via `getLiquidityForAmount1`.
+* **If Native is `token0` (`_nativeIsZero == true`):** It calculates liquidity using `amount0: _nativeAmount` via `getLiquidityForAmount0`.
+* **If Native is `token1` (`_nativeIsZero == false`):** It calculates liquidity using `amount1: _nativeAmount` via `getLiquidityForAmount1`.
 
 ---
 
@@ -167,3 +167,74 @@ The BidWall is always setting a limit order to sell ETH/USDC in exchange for HNY
 When ETH is token0, selling ETH corresponds to ticks above spot price.
 When ETH is token1, selling ETH corresponds to ticks below spot price.
 The _nativeIsZero branch ensures that no matter how the tokens are sorted, the ETH is always locked in the correct direction to act as a bid floor.
+
+
+
+
+...................................................................................................................................................
+
+
+
+
+Edited contractsToDeploy.txt
+Viewed BidWall.sol:1-669
+
+Here is the complete explanation of how **`BidWall.deposit`** and **`_reposition`** work together to create an automated **Price Floor / Buyback Bid**!
+
+---
+
+### 🎯 What is the BidWall?
+The BidWall acts as **Plunge Protection / Automated Price Support**. It takes accumulated ETH swap fees and places a **single-sided ETH buy order 1 tick below the current spot price**. If sellers dump the token, they sell directly into this ETH bid wall.
+
+---
+
+### 1. `BidWall.deposit()` — Fee Accumulation & Threshold Check
+
+When `PositionManager._distributeFees()` sends ETH fees to the BidWall:
+
+1. **Accrual**:
+   Adds `_ethSwapAmount` to `_poolInfo.pendingETHFees`.
+2. **Threshold Check (Default = 0.1 ETH)**:
+   ```solidity
+   if (_poolInfo.pendingETHFees < _getSwapFeeThreshold(...)) return;
+   ```
+   To save gas, it **batches** small fee deposits. It will not move or touch liquidity until `pendingETHFees` reaches **0.1 ETH**.
+3. **Trigger Reposition**:
+   Once `pendingETHFees >= 0.1 ETH`, `deposit()` calls `_reposition()`.
+
+---
+
+### 2. `_reposition()` — Rebalancing the Bid Wall
+
+When `_reposition()` runs, it performs a 4-step sequence to move the price floor to the latest market price:
+
+#### Step A: Remove the Old Position (`_removeLiquidity`)
+* If a previous BidWall position exists, it calls `poolManager.modifyLiquidity` with `-liquidityBefore` using `salt: 'bidwall'`.
+* This completely withdraws two things from the old position:
+  1. **Unspent ETH**: Any ETH that sellers didn't claim.
+  2. **Bought Memecoins**: Any Memecoins that sellers dumped into the BidWall.
+
+#### Step B: Route Bought Memecoins to Treasury
+```solidity
+if (memecoinWithdrawn != 0) {
+    IERC20(memecoin).transfer(memecoinTreasury, memecoinWithdrawn);
+}
+```
+* Any Memecoins captured by the BidWall are transferred directly to the project's **`MemecoinTreasury`** (effectively executing an automated **Buyback**!).
+
+#### Step C: Combine All Available ETH
+* It pools together:
+  $$\text{Total ETH} = \text{ETH Withdrawn from Old Position} + \text{New Pending ETH Fees}$$
+
+#### Step D: Calculate New 1-Tick Range & Mint (`_addETHLiquidity`)
+1. Reads the current spot price (`slot0Tick`).
+2. Calculates a 1-tick range **immediately 1 tick below spot price**:
+   * `baseTick = currentTick - 1`
+   * `[newTickLower, newTickUpper]`
+3. Calls `poolManager.modifyLiquidity` with `+liquidityDelta` and `salt: 'bidwall'`.
+4. Placed single-sided ETH bid at the new price floor!
+
+---
+
+### ⏰ Bonus: `checkStalePosition()`
+If trading volume is low and 7 days pass (`staleTimeWindow = 7 days`), `checkStalePosition()` will force `_reposition()` to run during the next swap even if `pendingETHFees` has not reached 0.1 ETH, keeping the floor price up-to-date!

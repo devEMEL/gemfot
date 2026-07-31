@@ -8,7 +8,7 @@ import {LPFeeLibrary} from "@uniswap/v4-core/src/libraries/LPFeeLibrary.sol";
 /**
  * This contract will allow for specific addresses to have reduced or nullified fees for all
  * swaps transactions within the pool. These will be allocated to partners that need a more
- * consistent underlying price to ensure their protocol can operate using Flaunch pools.
+ * consistent underlying price to ensure their protocol can operate using Launch pools.
  */
 contract FeeExemptions is Ownable {
     using LPFeeLibrary for uint24;

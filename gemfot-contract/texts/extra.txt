@@ -33,15 +33,15 @@ check how we have used flayGovernance in the code (how governance works ).
         uint24
     ) {
         /**
-         * [SCHEDULE][PREMINE] Check if the token is scheduled to be flaunched and only
+         * [SCHEDULE][PREMINE] Check if the token is scheduled to be launched and only
          * allow a swap to take place if there is a premine call available.
          */
 
         {
-            // If set, get the timestamp that the pool is scheduled to flaunch
+            // If set, get the timestamp that the pool is scheduled to launch
             PoolId poolId = _key.toId();
-            uint _flaunchesAt = launchesAt[poolId];
-            if (_flaunchesAt != 0) {
+            uint _launchesAt = launchesAt[poolId];
+            if (_launchesAt != 0) {
                 // If we have a schedule set for the token, then we need to make an additional
                 // check to see if a premine is set, and if it's valid. The validity of a premine
                 // ensures that we are in the same block and that the amount specified is the same.
@@ -52,8 +52,8 @@ check how we have used flayGovernance in the code (how governance works ).
                     emit PoolPremine(poolId, premineAmount);
                 } else {
                     // If the timestamp has not yet passed, then we revert
-                    if (_flaunchesAt > block.timestamp) {
-                        revert TokenNotLaunched(_flaunchesAt);
+                    if (_launchesAt > block.timestamp) {
+                        revert TokenNotLaunched(_launchesAt);
                     }
 
                     // Remove the schedule timestamp to prevent future checks

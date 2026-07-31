@@ -1,0 +1,46 @@
+ function closePosition(
+        PoolKey memory _poolKey,
+        uint _tokenFees,
+        bool _nativeIsZero
+    ) public onlyPositionManager returns (
+        FairLaunchInfo memory
+    ) {
+        // Reference the pool's FairLaunchInfo, ready to store updated values
+        FairLaunchInfo storage info = _fairLaunchInfo[_poolKey.toId()];
+
+        int24 tickLower;
+        int24 tickUpper;
+
+        if (_nativeIsZero) {
+            // ETH position
+            tickLower = (info.initialTick + 1).validTick(false);
+            tickUpper = tickLower + TickFinder.TICK_SPACING;
+            _createImmutablePosition(_poolKey, tickLower, tickUpper, info.revenue, true);
+
+            // memecoin position (unsold fair launch supply gets burned in PositionManager)
+            tickLower = TickFinder.MIN_TICK;
+            tickUpper = (info.initialTick - 1).validTick(true);
+            _createImmutablePosition(_poolKey, tickLower, tickUpper, _poolKey.currency1.balanceOf(msg.sender) - _tokenFees - info.supply, false); //
+        } else {
+            // ETH position
+            tickUpper = (info.initialTick - 1).validTick(true);
+            tickLower = tickUpper - TickFinder.TICK_SPACING;
+            _createImmutablePosition(_poolKey, tickLower, tickUpper, info.revenue, false);
+
+            // memecoin position (unsold fair launch supply gets burned in PositionManager)
+            tickLower = (info.initialTick + 1).validTick(false);
+            tickUpper = TickFinder.MAX_TICK;
+            _createImmutablePosition(_poolKey, tickLower, tickUpper, _poolKey.currency0.balanceOf(msg.sender) - _tokenFees - info.supply, true);
+        }
+
+        // Mark our position as closed
+        info.endsAt = block.timestamp;
+        info.closed = true;
+
+        // Emit the event with the balance of the currency we hold before we create a position with
+        // it. We determine the end time by seeing if it has ended early, or if we are past the point
+        // it was meant to end then we backdate it.
+        emit FairLaunchEnded(_poolKey.toId(), info.revenue, info.supply, info.endsAt);
+
+        return info;
+    }

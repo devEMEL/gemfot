@@ -94,7 +94,7 @@ contract BidWall is AccessControl, Ownable {
     /// Our Uniswap V4 {PoolManager} contract
     IPoolManager public immutable poolManager;
 
-    /// The native token used in the Flaunch protocol
+    /// The native token used in the Launch protocol
     address public immutable nativeToken;
 
     /// Timeout period to make a BidWall stale based on last transaction time
@@ -125,8 +125,8 @@ contract BidWall is AccessControl, Ownable {
         poolManager = IPoolManager(_poolManager);
 
         // Set our initial swapFeeThreshold and emit an update for the amount
-        _swapFeeThreshold = 100 * 10 ** 6;
-        emit FixedSwapFeeThresholdUpdated(100 * 10 ** 6);
+        _swapFeeThreshold = 200 * 10 ** 6; // 200 usdc
+        emit FixedSwapFeeThresholdUpdated(200 * 10 ** 6);
 
         // Emit our initial `staleTimeWindow` update
         emit StaleTimeWindowUpdated(staleTimeWindow);
@@ -246,13 +246,13 @@ contract BidWall is AccessControl, Ownable {
         uint totalFees = _poolInfo.pendingUSDCFees;
         _poolInfo.pendingUSDCFees = 0;
 
-        uint usdcWithdrawn;
+        uint nativeWithdrawn;
         uint memecoinWithdrawn;
 
         // Check if the BidWall has been initialized before, then we have a position
         if (_poolInfo.initialized) {
             // Remove tokens from our current position
-            (usdcWithdrawn, memecoinWithdrawn) = _removeLiquidity({
+            (nativeWithdrawn, memecoinWithdrawn) = _removeLiquidity({
                 _key: _poolKey,
                 _nativeIsZero: _nativeIsZero,
                 _tickLower: _poolInfo.tickLower,
@@ -261,8 +261,8 @@ contract BidWall is AccessControl, Ownable {
 
             // Send the received USDC to the {PositionManager}, as that will be supplying the USDC
             // tokens to create the new position.
-            if (usdcWithdrawn != 0) {
-                nativeToken.safeTransfer(msg.sender, usdcWithdrawn);
+            if (nativeWithdrawn != 0) {
+                nativeToken.safeTransfer(msg.sender, nativeWithdrawn);
             }
         } else {
             // If this is the first time we are adding liquidity, then we can set our
@@ -280,7 +280,7 @@ contract BidWall is AccessControl, Ownable {
          *      an overly generous price when the BidWall is triggered.
          *   2. The tick has moved AGAINST the native token, meaning that we will be creating our position
          *      to give a higher native token value. This means that liquidity calculations called within
-         *      the `_addUSDCLiquidity` will actually result in requiring both native _and_ memecoin tokens
+         *      the `_addNativeLiquidity` will actually result in requiring both native _and_ memecoin tokens
          *      to be settled. If this is the case then we instead need to use the `slot0` tick rather than
          *      the beforeSwap tick value provided in `_currentTick`.
          *
@@ -296,11 +296,11 @@ contract BidWall is AccessControl, Ownable {
 
         // Create our liquidity position; including any tokens withdrawn from our previous position if
         // set, as well as the additional swap fees.
-        _addUSDCLiquidity({
+        _addNativeLiquidity({
             _key: _poolKey,
             _nativeIsZero: _nativeIsZero,
             _currentTick: _currentTick,
-            _usdcAmount: usdcWithdrawn + totalFees
+            _usdcAmount: nativeWithdrawn + totalFees
         });
 
         // If we have memecoins available, then we transfer those to the treasury
@@ -315,7 +315,7 @@ contract BidWall is AccessControl, Ownable {
             emit BidWallRewardsTransferred(poolId, memecoinTreasury, memecoinWithdrawn);
         }
 
-        emit BidWallRepositioned(poolId, usdcWithdrawn + totalFees, _poolInfo.tickLower, _poolInfo.tickUpper);
+        emit BidWallRepositioned(poolId, nativeWithdrawn + totalFees, _poolInfo.tickLower, _poolInfo.tickUpper);
     }
 
     /**
@@ -407,13 +407,13 @@ contract BidWall is AccessControl, Ownable {
         PoolId poolId = _key.toId();
         PoolInfo storage _poolInfo = poolInfo[poolId];
 
-        uint usdcWithdrawn;
+        uint nativeWithdrawn;
         uint memecoinWithdrawn;
 
         // If the pool has not yet been initialized, then there will be no liquidity to remove
         if (_poolInfo.initialized) {
             // Remove all liquidity from the BidWall
-            (usdcWithdrawn, memecoinWithdrawn) = _removeLiquidity({
+            (nativeWithdrawn, memecoinWithdrawn) = _removeLiquidity({
                 _key: _key,
                 _nativeIsZero: nativeIsZero,
                 _tickLower: _poolInfo.tickLower,
@@ -442,8 +442,8 @@ contract BidWall is AccessControl, Ownable {
 
         // Transfer USDC withdrawn from the legacy position to the governance contract. We Avoid using
         // safe transfer as this could brick calls if a malicious governance was set by the token.
-        if (usdcWithdrawn != 0) {
-            nativeToken.safeTransfer(memecoinTreasury, usdcWithdrawn);
+        if (nativeWithdrawn != 0) {
+            nativeToken.safeTransfer(memecoinTreasury, nativeWithdrawn);
         }
 
         // Transfer the flTokens withdrawn from the legacy position to the governance contract
@@ -452,7 +452,7 @@ contract BidWall is AccessControl, Ownable {
             emit BidWallRewardsTransferred(poolId, memecoinTreasury, memecoinWithdrawn);
         }
 
-        emit BidWallClosed(poolId, memecoinTreasury, usdcWithdrawn + pendingUSDCFees);
+        emit BidWallClosed(poolId, memecoinTreasury, nativeWithdrawn + pendingUSDCFees);
     }
 
     /**
@@ -531,7 +531,7 @@ contract BidWall is AccessControl, Ownable {
      * @param _currentTick The current tick for the pool
      * @param _usdcAmount The amount of native token we are adding to the BidWall
      */
-    function _addUSDCLiquidity(
+    function _addNativeLiquidity(
         PoolKey memory _key,
         bool _nativeIsZero,
         int24 _currentTick,
@@ -598,7 +598,7 @@ contract BidWall is AccessControl, Ownable {
      * @param _tickLower The lower tick of our BidWall position
      * @param _tickUpper The upper tick of our BidWall position
      *
-     * @return usdcWithdrawn_ The amount of native token withdrawn
+     * @return nativeWithdrawn_ The amount of native token withdrawn
      * @return memecoinWithdrawn_ The amount of Memecoin withdrawn
      */
     function _removeLiquidity(
@@ -606,7 +606,7 @@ contract BidWall is AccessControl, Ownable {
         bool _nativeIsZero,
         int24 _tickLower,
         int24 _tickUpper
-    ) internal returns (uint usdcWithdrawn_, uint memecoinWithdrawn_) {
+    ) internal returns (uint nativeWithdrawn_, uint memecoinWithdrawn_) {
         // Get our existing liquidity for the position
         (uint128 liquidityBefore,,) = poolManager.getPositionInfo({
             poolId: _key.toId(), owner: address(this), tickLower: _tickLower, tickUpper: _tickUpper, salt: "bidwall"
@@ -621,7 +621,7 @@ contract BidWall is AccessControl, Ownable {
         });
 
         // Set our USDC and Memecoin withdrawn amounts, depending on if the native token is currency0
-        (usdcWithdrawn_, memecoinWithdrawn_) = _nativeIsZero
+        (nativeWithdrawn_, memecoinWithdrawn_) = _nativeIsZero
             ? (uint128(delta.amount0()), uint128(delta.amount1()))
             : (uint128(delta.amount1()), uint128(delta.amount0()));
     }

@@ -44774,10 +44774,10 @@ var require_v3_sdk_cjs_development = __commonJS({
           amount1Max: MaxUint128
         }]));
         if (involvesETH) {
-          var ethAmount = options.expectedCurrencyOwed0.currency.isNative ? options.expectedCurrencyOwed0.quotient : options.expectedCurrencyOwed1.quotient;
+          var nativeAmount = options.expectedCurrencyOwed0.currency.isNative ? options.expectedCurrencyOwed0.quotient : options.expectedCurrencyOwed1.quotient;
           var token = options.expectedCurrencyOwed0.currency.isNative ? options.expectedCurrencyOwed1.currency : options.expectedCurrencyOwed0.currency;
           var tokenAmount = options.expectedCurrencyOwed0.currency.isNative ? options.expectedCurrencyOwed1.quotient : options.expectedCurrencyOwed0.quotient;
-          calldatas.push(Payments.encodeUnwrapWETH9(ethAmount, recipient));
+          calldatas.push(Payments.encodeUnwrapWETH9(nativeAmount, recipient));
           calldatas.push(Payments.encodeSweepToken(token, tokenAmount, recipient));
         }
         return calldatas;

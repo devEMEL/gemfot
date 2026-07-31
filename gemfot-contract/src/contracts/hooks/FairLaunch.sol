@@ -256,16 +256,16 @@ contract FairLaunch is AccessControl {
             return (beforeSwapDelta_, balanceDelta_, info);
         }
 
-        uint ethIn;
+        uint nativeIn;
         uint tokensOut;
 
         // If we have a negative amount specified, then we have an ETH amount passed in and want
         // to buy as many tokens as we can for that price.
         if (_amountSpecified < 0) {
-            ethIn = uint(-_amountSpecified);
+            nativeIn = uint(-_amountSpecified);
             tokensOut = _getQuoteAtTick(
                 info.initialTick,
-                ethIn,
+                nativeIn,
                 Currency.unwrap(_nativeIsZero ? _poolKey.currency0 : _poolKey.currency1),
                 Currency.unwrap(_nativeIsZero ? _poolKey.currency1 : _poolKey.currency0)
             );
@@ -274,7 +274,7 @@ contract FairLaunch is AccessControl {
         // are being purchased and need to calculate the amount of ETH required.
         else {
             tokensOut = uint(_amountSpecified);
-            ethIn = _getQuoteAtTick(
+            nativeIn = _getQuoteAtTick(
                 info.initialTick,
                 tokensOut,
                 Currency.unwrap(!_nativeIsZero ? _poolKey.currency0 : _poolKey.currency1),
@@ -285,10 +285,10 @@ contract FairLaunch is AccessControl {
         // If the user has requested more tokens than are available in the fair launch, then we
         // need to strip back the amount that we can fulfill.
         if (tokensOut > info.supply) {
-            // Calculate the percentage of tokensOut relative to the threshold and reduce the `ethIn`
+            // Calculate the percentage of tokensOut relative to the threshold and reduce the `nativeIn`
             // value by the same amount. There may be some slight accuracy loss, but it's all good.
             uint percentage = info.supply * 1e18 / tokensOut;
-            ethIn = (ethIn * percentage) / 1e18;
+            nativeIn = (nativeIn * percentage) / 1e18;
 
             // Update our `tokensOut` to the supply limit
             tokensOut = info.supply;
@@ -296,16 +296,16 @@ contract FairLaunch is AccessControl {
 
         // Get our BeforeSwapDelta response ready
         beforeSwapDelta_ = (_amountSpecified < 0)
-            ? toBeforeSwapDelta(ethIn.toInt128(), -tokensOut.toInt128())
-            : toBeforeSwapDelta(-tokensOut.toInt128(), ethIn.toInt128());
+            ? toBeforeSwapDelta(nativeIn.toInt128(), -tokensOut.toInt128())
+            : toBeforeSwapDelta(-tokensOut.toInt128(), nativeIn.toInt128());
 
         // Define our BalanceDelta
         balanceDelta_ = toBalanceDelta(
-            _nativeIsZero ? ethIn.toInt128() : -tokensOut.toInt128(),
-            _nativeIsZero ? -tokensOut.toInt128() : ethIn.toInt128()
+            _nativeIsZero ? nativeIn.toInt128() : -tokensOut.toInt128(),
+            _nativeIsZero ? -tokensOut.toInt128() : nativeIn.toInt128()
         );
 
-        info.revenue += ethIn;
+        info.revenue += nativeIn;
         info.supply -= tokensOut;
 
         return (beforeSwapDelta_, balanceDelta_, info);

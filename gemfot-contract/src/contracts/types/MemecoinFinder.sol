@@ -15,7 +15,7 @@ library MemecoinFinder {
      * Finds the {IMemecoin} attached to a `PoolKey` by assuming it is not the `_nativeToken`.
      *
      * @param _key The `PoolKey` that is being discovered
-     * @param _nativeToken The native token used by Flaunch
+     * @param _nativeToken The native token used by Launch
      * native token = USDC
      * @return The {IMemecoin} contract from the `PoolKey`
      */

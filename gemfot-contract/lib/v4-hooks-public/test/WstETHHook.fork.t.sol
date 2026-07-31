@@ -112,13 +112,13 @@ contract WstETHHookForkTest is Test, Deployers {
 
             // Get tokens from whales and set up approvals
             vm.startPrank(STETH_WHALE);
-            uint256 stethAmount = 100 ether;
-            stETH.transfer(alice, stethAmount);
+            uint256 stnativeAmount = 100 ether;
+            stETH.transfer(alice, stnativeAmount);
             vm.stopPrank();
 
             vm.startPrank(WSTETH_WHALE);
-            uint256 wstethAmount = 100 ether;
-            IERC20(WSTETH).transfer(alice, wstethAmount);
+            uint256 wstnativeAmount = 100 ether;
+            IERC20(WSTETH).transfer(alice, wstnativeAmount);
             vm.stopPrank();
 
             // Approve tokens

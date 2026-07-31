@@ -65,7 +65,7 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
     error UnknownPool(PoolId _poolId);
 
 
-    /// Emitted when a Flaunch pool is created
+    /// Emitted when a Launch pool is created
     event PoolCreated(
         PoolId indexed _poolId,
         address _memecoin,
@@ -76,8 +76,8 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
         LaunchParams _params
     );
 
-    /// Emitted when a Flaunch pool is scheduled
-    event PoolScheduled(PoolId indexed _poolId, uint _flaunchesAt);
+    /// Emitted when a Launch pool is scheduled
+    event PoolScheduled(PoolId indexed _poolId, uint _launchesAt);
 
     /// Emitted when a pool swap occurs
     event PoolSwap(
@@ -108,6 +108,9 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
 
     /// Emitted when a user successfully premines their token
     event PoolPremine(PoolId indexed _poolId, int _premineAmount);
+
+    /// Emitted when unused premine is forfeited (deadline / sold out) and tstore cleared
+    event PremineBurned(PoolId indexed _poolId, uint _premineAmount);
 
     /// Emitted when the `IInitialPrice` contract has been updated
     event InitialPriceUpdated(address _initialPrice);
@@ -468,27 +471,38 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
         uint24
     ) {
         /**
-         * [SCHEDULE][PREMINE] Check if the token is scheduled to be flaunched and only
-         * allow a swap to take place if there is a premine call available.
+         * [SCHEDULE][PREMINE] Creators pass their address in hookData (`abi.encode(user)`).
+         * Premine amount is set at launch via tstore (line ~320) and is already included in
+         * FairLaunch supply — no addSupply. On success or expiry, clear tstore.
          */
+        PoolId poolId = _key.toId();
+        bool nativeIsZero = nativeToken == Currency.unwrap(_key.currency0);
+        address swapper = _resolveSwapper(_sender, _hookData);
+        int premineAmount = _tload(PoolId.unwrap(poolId));
+        bool isCreatorPremine;
+
+        if (premineAmount != 0) {
+            // Exact-output buy of the reserved premine by the token creator
+            isCreatorPremine = swapper == _key.memecoin(nativeToken).creator()
+                && _params.amountSpecified == premineAmount
+                && nativeIsZero == _params.zeroForOne;
+
+            if (isCreatorPremine) {
+                emit PoolPremine(poolId, premineAmount);
+                // Clear premine claim so it cannot be reused
+                assembly {
+                    tstore(poolId, 0)
+                }
+            }
+        }
 
         {
-            // If set, get the timestamp that the pool is scheduled to flaunch
-            PoolId poolId = _key.toId();
-            uint _flaunchesAt = launchesAt[poolId];
-            if (_flaunchesAt != 0) {
-                // If we have a schedule set for the token, then we need to make an additional
-                // check to see if a premine is set, and if it's valid. The validity of a premine
-                // ensures that we are in the same block and that the amount specified is the same.
-                // We cannot check that the caller is the same as the `_sender` is obfuscated to
-                // be the swap contract.
-                int premineAmount = _tload(PoolId.unwrap(poolId));
-                if (premineAmount != 0 && _params.amountSpecified == premineAmount) {
-                    emit PoolPremine(poolId, premineAmount);
-                } else {
+            uint _launchesAt = launchesAt[poolId];
+            if (_launchesAt != 0) {
+                if (!isCreatorPremine) {
                     // If the timestamp has not yet passed, then we revert
-                    if (_flaunchesAt > block.timestamp) {
-                        revert TokenNotLaunched(_flaunchesAt);
+                    if (_launchesAt > block.timestamp) {
+                        revert TokenNotLaunched(_launchesAt);
                     }
 
                     // Remove the schedule timestamp to prevent future checks
@@ -497,8 +511,6 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
             }
         }
 
-        PoolId poolId = _key.toId();
-        bool nativeIsZero = nativeToken == Currency.unwrap(_key.currency0);
         // Remaining amount for FairLaunch / Uniswap after ISP fills first
         int amountRemaining = _params.amountSpecified;
 
@@ -509,9 +521,12 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
         if (!fairLaunchInfo.closed) {
             /**
              * [FL] If it's not premine, and the FairLaunch window has ended, but our position is still open, then we
-             * need to close the position.
+             * need to close the position. Clear and forfeit any unused creator premine (burned with unsold supply).
              */
-            if (_tload(PoolId.unwrap(poolId)) == 0 && !fairLaunch.inFairLaunchWindow(poolId)) {
+            if (!isCreatorPremine && !fairLaunch.inFairLaunchWindow(poolId)) {
+                // Creator missed their premine — clear tstore; tokens are burned with unsold FL supply below
+                _clearUnusedPremine(poolId);
+
                 uint unsoldSupply = fairLaunchInfo.supply;
 
                 // closes the fair launch position, putting remaining memecoin supply into the liquidity pool
@@ -522,7 +537,7 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
                     _nativeIsZero: nativeIsZero
                 });
 
-                // burn the unsold fair launch supply
+                // burn the unsold fair launch supply (includes any unused premine)
                 if (unsoldSupply != 0) {
                     (nativeIsZero ? _key.currency1 : _key.currency0).transfer(BURN_ADDRESS, unsoldSupply);
                     emit FairLaunchBurn(poolId, unsoldSupply);
@@ -579,6 +594,7 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
 
         /**
          * [FL] Fill any remaining amount from the FairLaunch position after ISP.
+         * Creator premine is sold here from existing FairLaunch supply.
          */
         if (inActiveFairLaunch && amountRemaining != 0) {
             BalanceDelta fairLaunchFillDelta;
@@ -618,20 +634,15 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
 
             // If we have run out of tokens, then we can close the pool
             if (fairLaunchInfo.supply == 0) {
+                // Sold out before creator bought — forfeit premine claim and clear tstore
+                _clearUnusedPremine(poolId);
+
                 fairLaunch.closePosition({
                     _poolKey: _key,
                     _tokenFees: _poolFees[poolId].amount1,
                     _nativeIsZero: nativeIsZero
                 });
             }
-        }
-
-        /**
-         * [PREMINE] Delete our transient storage data to prevent premines ever being triggered
-         * over multiple swaps.
-         */
-        assembly {
-            tstore(poolId, 0)
         }
 
         // Capture the beforeSwap tick value before actioning our Uniswap swap
@@ -642,7 +653,7 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
         bidWall.checkStalePosition({
             _poolKey: _key,
             _currentTick: _beforeSwapTick,
-            _nativeIsZero: nativeToken == Currency.unwrap(_key.currency0)
+            _nativeIsZero: nativeIsZero
         });
 
         // Set our return selector
@@ -731,7 +742,7 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
 
 
     /**
-     * Updates the `IInitialPrice` contract address that is used during `flaunch` to calculate
+     * Updates the `IInitialPrice` contract address that is used during `launch` to calculate
      * the initial tick / sqrtPriceX96 value.
      *
      * @param _initialPrice The contract address for the `IInitialPrice` contract
@@ -897,7 +908,7 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
      *
      * @param _launchContract The new {ILaunch} contract address
      */
-    function setFlaunch(
+    function setLaunch(
         address _launchContract
     ) public onlyOwner {
         launchContract = ILaunch(_launchContract);
@@ -1071,6 +1082,45 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
     ) internal returns (bytes memory result) {
         bidWall.closeBidWall(abi.decode(_data, (PoolKey)));
         return result;
+    }
+
+    /**
+     * Resolves the real swapper. Routers obfuscate `_sender`, so pass `abi.encode(user)` in hookData.
+     */
+    function _resolveSwapper(
+        address _sender,
+        bytes calldata _hookData
+    ) internal pure returns (address swapper_) {
+        if (_hookData.length == 32) {
+            swapper_ = abi.decode(_hookData, (address));
+        } else if (_hookData.length == 20) {
+            assembly {
+                // load 32 bytes from calldata, shift right 12 bytes (96 bits)
+                // to isolate the 20-byte address in the low bits
+                swapper_ := shr(96, calldataload(_hookData.offset))
+            }
+        } else {
+            swapper_ = _sender;
+        }
+    }
+
+    /**
+     * If the creator never purchased their premine, clear the tstore claim.
+     * On FairLaunch deadline the tokens are burned with unsold FL supply; on sold-out the
+     * tokens were already bought by the public so only the claim is cleared.
+     */
+    function _clearUnusedPremine(
+        PoolId _poolId
+    ) internal {
+        int premine = _tload(PoolId.unwrap(_poolId));
+        if (premine == 0) {
+            return;
+        }
+
+        assembly {
+            tstore(_poolId, 0)
+        }
+        emit PremineBurned(_poolId, uint(premine));
     }
 
     /**

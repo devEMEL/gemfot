@@ -1,7 +1,7 @@
 
 Section FeeEscrow
 
-The `FeeEscrow` contract acts as a centralized vault for accumulating and storing fees generated across the Flaunch protocol. Its primary purposes are gas efficiency and user convenience.
+The `FeeEscrow` contract acts as a centralized vault for accumulating and storing fees generated across the Launch protocol. Its primary purposes are gas efficiency and user convenience.
 
 It holds fees for ProtocolFeeRecipient, the Memecoin Treasury and the token creator, using ETH or flETH.
 

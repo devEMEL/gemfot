@@ -101,7 +101,7 @@ abstract contract InternalSwapPool {
      * @param _params The swap parameters
      * @param _nativeIsZero If our native token is `currency0`
      *
-     * @return ethIn_ The ETH taken for the swap
+     * @return nativeIn_ The ETH taken for the swap
      * @return tokenOut_ The tokens given for the swap
      */
     function _internalSwap(
@@ -109,19 +109,19 @@ abstract contract InternalSwapPool {
         PoolKey calldata _key,
         SwapParams memory _params,
         bool _nativeIsZero
-    ) internal returns (uint ethIn_, uint tokenOut_) {
+    ) internal returns (uint nativeIn_, uint tokenOut_) {
         PoolId poolId = _key.toId();
 
         // Load our PoolFees as storage as we will manipulate them later if we trigger
         ClaimableFees storage pendingPoolFees = _poolFees[poolId];
         if (pendingPoolFees.amount1 == 0) {
-            return (ethIn_, tokenOut_);
+            return (nativeIn_, tokenOut_);
         }
 
         // We only want to process our internal swap if we are buying non-ETH tokens with ETH. This
         // will allow us to correctly calculate the amount of token to replace.
         if (_nativeIsZero != _params.zeroForOne) {
-            return (ethIn_, tokenOut_);
+            return (nativeIn_, tokenOut_);
         }
 
         // Get the current price for our pool
@@ -137,7 +137,7 @@ abstract contract InternalSwapPool {
 
             // Capture the amount of desired token required at the current pool state to
             // purchase the amount of token speicified, capped by the pool fees available.
-            (, ethIn_, tokenOut_,) = SwapMath.computeSwapStep({
+            (, nativeIn_, tokenOut_,) = SwapMath.computeSwapStep({
                 sqrtPriceCurrentX96: sqrtPriceX96,
                 sqrtPriceTargetX96: _params.sqrtPriceLimitX96,
                 liquidity: _poolManager.getLiquidity(poolId),
@@ -151,7 +151,7 @@ abstract contract InternalSwapPool {
             // To calculate the amount of tokens that we can receive, we first pass in the amount
             // of ETH that we are requesting to spend. We need to invert the `sqrtPriceTargetX96`
             // as our swap step computation is essentially calculating the opposite direction.
-            (, tokenOut_, ethIn_,) = SwapMath.computeSwapStep({
+            (, tokenOut_, nativeIn_,) = SwapMath.computeSwapStep({
                 sqrtPriceCurrentX96: sqrtPriceX96,
                 sqrtPriceTargetX96: _params.zeroForOne ? TickMath.MAX_SQRT_PRICE - 1 : TickMath.MIN_SQRT_PRICE + 1,
                 liquidity: _poolManager.getLiquidity(poolId),
@@ -162,27 +162,27 @@ abstract contract InternalSwapPool {
             // If we cannot fulfill the full amount of the internal orderbook, then we want to
             // calculate the percentage of which we can utilize.
             if (tokenOut_ > pendingPoolFees.amount1) {
-                ethIn_ = (pendingPoolFees.amount1 * ethIn_) / tokenOut_;
+                nativeIn_ = (pendingPoolFees.amount1 * nativeIn_) / tokenOut_;
                 tokenOut_ = pendingPoolFees.amount1;
             }
         }
 
         // If nothing has happened, we can exit
-        if (ethIn_ == 0 && tokenOut_ == 0) {
-            return (ethIn_, tokenOut_);
+        if (nativeIn_ == 0 && tokenOut_ == 0) {
+            return (nativeIn_, tokenOut_);
         }
 
         // Reduce the amount of fees that have been extracted from the pool and converted
         // into ETH fees.
-        pendingPoolFees.amount0 += ethIn_;
+        pendingPoolFees.amount0 += nativeIn_;
         pendingPoolFees.amount1 -= tokenOut_;
 
         // Take the required ETH tokens from the {PoolManager} to settle the currency change. The
         // `tokensOut_` are settled externally to this call.
-        _poolManager.take(!_nativeIsZero ? _key.currency1 : _key.currency0, address(this), ethIn_);
+        _poolManager.take(!_nativeIsZero ? _key.currency1 : _key.currency0, address(this), nativeIn_);
         (!_nativeIsZero ? _key.currency0 : _key.currency1).settle(_poolManager, address(this), tokenOut_, false);
 
         // Capture the swap cost that we captured from our drip
-        emit PoolFeesSwapped(poolId, _params.zeroForOne, ethIn_, tokenOut_);
+        emit PoolFeesSwapped(poolId, _params.zeroForOne, nativeIn_, tokenOut_);
     }
 }

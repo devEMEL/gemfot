@@ -68,7 +68,7 @@ if (_params.creatorFeeAllocation != 0) {
     creatorFee[poolId] = _params.creatorFeeAllocation;
 }
 ```
-When calling `PositionManager.flaunch()`, the creator specifies `creatorFeeAllocation` inside the `FlaunchParams` struct.
+When calling `PositionManager.launch()`, the creator specifies `creatorFeeAllocation` inside the `LaunchParams` struct.
 
 ---
 

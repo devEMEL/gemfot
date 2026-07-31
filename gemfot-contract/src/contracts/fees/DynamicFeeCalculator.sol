@@ -185,10 +185,10 @@ contract DynamicFeeCalculator is IFeeCalculator {
     }
 
     /**
-     * We don't need any specific Flaunch parameters to be assigned to this calculator, so we
+     * We don't need any specific Launch parameters to be assigned to this calculator, so we
      * can just provide empty logic.
      */
-    function setFlaunchParams(
+    function setLaunchParams(
         PoolId _poolId,
         bytes calldata _params
     ) external override {

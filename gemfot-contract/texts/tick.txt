@@ -1,0 +1,66 @@
+difference between  _currentTick + 1.validTick(false) and _currentTick - 1.validTick(false)
+
+
+That `+ 1` (or `- 1`) is a critical **edge-case guard** for when `_currentTick` is **already an exact multiple of 60**!
+
+Look at lines 37–39 of `TickFinder.sol`:
+
+```solidity
+// If the tick is already valid, exit early
+if (_tick % TICK_SPACING == 0) {
+    return _tick;
+}
+```
+
+---
+
+### What happens if `_currentTick = 120` (already on a boundary)?
+
+#### Scenario 1: WITHOUT `+ 1`
+* `120.validTick(false)`
+* `120 % 60 == 0` is `true` $\rightarrow$ **returns `120`**.
+* ❌ **Problem**: `120` is the **current in-range spot price**! Minting a position at `120` makes it dual-sided, so some of your ETH would be immediately sold/converted at spot price!
+
+#### Scenario 2: WITH `+ 1`
+* `(120 + 1).validTick(false)` $\rightarrow$ `121.validTick(false)`
+* `121 % 60 == 0` is `false`.
+* `121` rounds UP to **`180`**!
+* ✅ **Success**: It forces the position to step **completely out-of-range** to `180` (strictly 1 tick boundary above spot price), guaranteeing a 100% single-sided ETH position.
+
+---
+
+### Summary
+Adding `+ 1` or `- 1` ensures that even if the pool is sitting **exactly on a tick boundary**, the calculation always pushes the position **outside the current tick** so it remains 100% single-sided!
+
+
+
+
+
+Here is the exact scenario for **`- 1`** when we are trying to find a tick boundary **below** current spot price:
+
+Suppose `_currentTick = 120` (which is already an exact multiple of 60):
+
+---
+
+### Scenario 1: WITHOUT `- 1` (`120.validTick(true)`)
+* `120 % 60 == 0` is **`true`**.
+* `TickFinder` returns **`120`**.
+* ❌ **Problem**: `120` is the **current active spot price**. If you use `120` as your upper boundary, the position touches the current spot tick and is **partially in-range**!
+
+---
+
+### Scenario 2: WITH `- 1` (`(120 - 1).validTick(true)`)
+* `120 - 1 = 119`
+* `119.validTick(true)` (Round DOWN)
+* `119 % 60 == 0` is **`false`**.
+* `TickFinder` rounds down and returns **`60`**!
+* ✅ **Success**: It forces the upper boundary down to **`60`**, which is **completely out-of-range** (strictly below current spot price), ensuring a 100% clean single-sided position!
+
+---
+
+### Summary Comparison Table
+
+| Goal | Exact Boundary Spot Price (`_currentTick = 120`) | Without `-1` / `+1` | With `-1` / `+1` | Result |
+| :--- | :--- | :--- | :--- | :--- |
+| **Out-of-range ABOVE** | Round UP | Returns `120` (In-range ❌) | `(120 + 1).validTick(false)` $\rightarrow$ **`180`** | Clean Out-of-Range ✅ |
+| **Out-of-range BELOW** | Round DOWN | Returns `120` (In-range ❌) | `(120 - 1).validTick(true)` $\rightarrow$ **`60`** | Clean Out-of-Range ✅ |

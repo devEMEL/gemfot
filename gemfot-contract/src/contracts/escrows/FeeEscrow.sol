@@ -42,7 +42,7 @@ contract FeeEscrow is Ownable {
     /**
      * Constructor to initialize the PoolSwap contract address.
      *
-     * @param _nativeToken The native token used by the Flaunch protocol
+     * @param _nativeToken The native token used by the Launch protocol
      * @param _indexer The {IndexerSubscriber} contract address
      */
     constructor(

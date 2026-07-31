@@ -1,12 +1,25 @@
 
 
-FIRST SEARCH FLAUNCH AND UPDATE ALL TO LAUNCH...
-
 
 ////
 
 
 functions to call/set after deploying all contracts (ask ai later, to make sure all is set..)
+
+-- check all setters like setSwapFeeThreshold etc and store them for reference.
+
+-- (no need since its enabled by default) token creator calls setDisabledState with false to enable bidwall. (so memecoin treasury gets no fee)
+-- TOKEN CREATOR CAN DECIDE WHAT TO DO WITH TOKENS IN THE MEMECOIN TREASURY LATER
+-- (change in BidWall.sol) _swapFeeThreshold = 0.1 ether; // change from 0.1 to 200 usdc
+-- setSwapFeeThreshold (owner can also update it)
+
+-- deploy ActionManager.sol and approve all treasury actions (deploy all) with approveAction(address action)
+-- token creator can call executeAction on MemecoinTreasury(action, data)..check the action contract to see how to encode data.
+
+-- in the frontend, once connected wallet is token creator (show memecoin treasury balance and they should see actions like burntokens, buyback ...memecoin treasury funds btw..)
+
+-- explain fee distribution well in presentation/slides/whatever (the % structure and which goes to the other if not enabled/valid)
+-- check how to enable bidwall (its used for buyback right?)
 
 -- deploy protocolFeeRecipient
 -- everybody should WITHDRAW fees directly from feeEscrow.sol and protocolowner should withdraw via protocolFeeRecipient
@@ -17,14 +30,19 @@ functions to call/set after deploying all contracts (ask ai later, to make sure 
 -- deploy bidwall
 -- deploy feeEscrow and set _indexer (indexer.sol) in the constructor
 -- set _feeCalculator to address(0) (dont deploy it, just pass address(0))
--- call setFlaunch and setInitialPrice to set both launch and InitialPrice(MarketCappedPrice) ca
+-- call setLaunch and setInitialPrice to set both launch and InitialPrice(MarketCappedPrice) ca
 -- call setFeeEscrow on protocolFeeRecipient.sol to set feeEscrow address
+
+--- WE CAN ALWAYS ADD MORE ACTIONS AND MANAGERS IN FUTURE.......................
+
+------ CAN DO ---------
+-- TOKEN CREATROR CAN closeBidWall() WHICH REMOVES LIQUIDITY AND SEND TOKENS TO MemecoinTreasury
 
 MAX_PROTOCOL_ALLOCATION = 10_00;
 creator chooses their allocation
 set others like 
 
-............. what is flaunch swap fee 
+............. what is launch swap fee 
 
 (all fees are in %)
 

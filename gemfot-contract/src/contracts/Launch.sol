@@ -58,7 +58,7 @@ contract Launch is ERC721, ILaunch, Initializable, Ownable {
     /// many tokens currently exist in the protocol.
     uint public nextTokenId = 1;
 
-    /// The Flaunch {GemFotManager} contract
+    /// The Launch {GemFotManager} contract
     GemFotManager public gemfotManager;
 
     /// Our token implementations that will be deployed when a new token is launched
