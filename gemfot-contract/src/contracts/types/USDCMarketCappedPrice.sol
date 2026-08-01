@@ -10,5 +10,6 @@ pragma solidity ^0.8.26;
 struct MarketCappedPriceParams {
     uint totalSupply;
     uint usdcMarketCap;
+    uint targetRaise; // The exact amount to raise (in USDC 6 decimals)
 }
 

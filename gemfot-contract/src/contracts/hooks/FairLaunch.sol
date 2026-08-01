@@ -14,6 +14,8 @@ import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {LiquidityAmounts} from "@uniswap/v4-core/test/utils/LiquidityAmounts.sol";
 
+import {LinearBondingCurve} from "../libraries/LinearBondingCurve.sol";
+
 import {ProtocolRoles} from "@gemfot/libraries/ProtocolRoles.sol";
 import {TickFinder} from "@gemfot/types/TickFinder.sol";
 import {ModifyLiquidityParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
@@ -43,10 +45,13 @@ contract FairLaunch is AccessControl {
     error NotGemFotManager();
 
     /// Emitted when a Fair Launch position is created
-    event FairLaunchCreated(PoolId indexed _poolId, uint _tokens, uint _tokenTotalSupply, uint _startsAt, uint _endsAt);
+    event FairLaunchCreated(PoolId indexed _poolId, uint _tokens, uint _startsAt, uint _endsAt);
 
     /// Emitted when a Fair Launch is ended and rebalanced
-    event FairLaunchEnded(PoolId indexed _poolId, uint _revenue, uint _supply, uint _endedAt);
+    event FairLaunchEnded(PoolId indexed _poolId, uint _revenue, uint _initialSupply, uint _remainingSupply, uint _endedAt);
+
+    /// Emitted when tokens are bought during Fair Launch
+    event FairLaunchBought(PoolId indexed _poolId, uint _nativeIn, uint _tokensOut, uint _sold);
 
     /**
      * Holds FairLaunch information for a Pool.
@@ -55,17 +60,20 @@ contract FairLaunch is AccessControl {
      * @custom:member endsAt The unix timestamp that the FairLaunch window ends
      * @custom:member initialTick The tick that the FairLaunch position was created at
      * @custom:member revenue The amount of revenue earned by the FairLaunch position
-     * @custom:member supply The amount of supply in the FairLaunch
+     * @custom:member initialSupply The amount of supply in the FairLaunch
+     * @custom:member remainingSupply The amount of supply remaining in the FairLaunch
      * @custom:member closed If the FairLaunch has been closed
      */
     struct FairLaunchInfo {
         uint startsAt;
         uint endsAt;
-        int24 initialTick;
         uint revenue;
-        uint supply;
-        uint totalSupply;
+        uint initialSupply;
+        uint remainingSupply;
         bool closed;
+        uint targetMarketCap;
+        uint targetRaise;
+        uint p0;
     }
 
     /// Maps a PoolId to a FairLaunchInfo struct
@@ -87,6 +95,7 @@ contract FairLaunch is AccessControl {
         // Set our caller to have the default admin of protocol roles
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
+
 
     /**
      * Checks if the {PoolKey} is within the fair launch window.
@@ -123,11 +132,12 @@ contract FairLaunch is AccessControl {
      */
     function createPosition(
         PoolId _poolId,
-        int24 _initialTick,
         uint _launchesAt,
         uint _initialTokenFairLaunch,
-        uint _tokenTotalSupply,
-        uint _fairLaunchDuration
+        uint _fairLaunchDuration,
+        uint _targetMarketCap,
+        uint _targetRaise,
+        uint _p0
     ) public virtual onlyGemFotManager returns (FairLaunchInfo memory) {
         // If we have no initial tokens, then we need to overwrite our fair launch duration to zero
         if (_initialTokenFairLaunch == 0) {
@@ -142,14 +152,16 @@ contract FairLaunch is AccessControl {
         _fairLaunchInfo[_poolId] = FairLaunchInfo({
             startsAt: _launchesAt,
             endsAt: endsAt,
-            initialTick: _initialTick,
             revenue: 0,
-            supply: _initialTokenFairLaunch,
-            totalSupply: _tokenTotalSupply,
-            closed: false
+            initialSupply: _initialTokenFairLaunch,
+            remainingSupply: _initialTokenFairLaunch,
+            closed: false,
+            targetMarketCap: _targetMarketCap,
+            targetRaise: _targetRaise,
+            p0: _p0
         });
 
-        emit FairLaunchCreated(_poolId, _initialTokenFairLaunch, _tokenTotalSupply, _launchesAt, endsAt);
+        emit FairLaunchCreated(_poolId, _initialTokenFairLaunch, _launchesAt, endsAt);
         return _fairLaunchInfo[_poolId];
     }
 
@@ -161,11 +173,13 @@ contract FairLaunch is AccessControl {
      * @param _poolKey The PoolKey we are closing the FairLaunch position of
      * @param _tokenFees The amount of token fees that need to remain in the {GemFotManager}
      * @param _nativeIsZero If our native token is `currency0`
+     * @param _initialTick The tick where the position should be created
      */
     function closePosition(
         PoolKey memory _poolKey,
         uint _tokenFees,
-        bool _nativeIsZero
+        bool _nativeIsZero,
+        int24 _initialTick
     ) public onlyGemFotManager returns (FairLaunchInfo memory) {
         // Reference the pool's FairLaunchInfo, ready to store updated values
         FairLaunchInfo storage info = _fairLaunchInfo[_poolKey.toId()];
@@ -175,34 +189,34 @@ contract FairLaunch is AccessControl {
 
         if (_nativeIsZero) {
             // USDC position
-            tickLower = (info.initialTick + 1).validTick(false);
+            tickLower = (_initialTick + 1).validTick(false);
             tickUpper = tickLower + TickFinder.TICK_SPACING;
             _createImmutablePosition(_poolKey, tickLower, tickUpper, info.revenue, true);
 
             // memecoin position (unsold fair launch supply gets burned in GemFotManager)
             tickLower = TickFinder.MIN_TICK;
-            tickUpper = (info.initialTick - 1).validTick(true);
+            tickUpper = (_initialTick - 1).validTick(true);
             _createImmutablePosition(
                 _poolKey,
                 tickLower,
                 tickUpper,
-                _poolKey.currency1.balanceOf(msg.sender) - _tokenFees - info.supply,
+                _poolKey.currency1.balanceOf(msg.sender) - _tokenFees - info.remainingSupply,
                 false
             );
         } else {
             // USDC position
-            tickUpper = (info.initialTick - 1).validTick(true);
+            tickUpper = (_initialTick - 1).validTick(true);
             tickLower = tickUpper - TickFinder.TICK_SPACING;
             _createImmutablePosition(_poolKey, tickLower, tickUpper, info.revenue, false);
 
             // memecoin position (unsold fair launch supply gets burned in GemFotManager)
-            tickLower = (info.initialTick + 1).validTick(false);
+            tickLower = (_initialTick + 1).validTick(false);
             tickUpper = TickFinder.MAX_TICK;
             _createImmutablePosition(
                 _poolKey,
                 tickLower,
                 tickUpper,
-                _poolKey.currency0.balanceOf(msg.sender) - _tokenFees - info.supply,
+                _poolKey.currency0.balanceOf(msg.sender) - _tokenFees - info.remainingSupply,
                 true
             );
         }
@@ -214,12 +228,13 @@ contract FairLaunch is AccessControl {
         // Emit the event with the balance of the currency we hold before we create a position with
         // it. We determine the end time by seeing if it has ended early, or if we are past the point
         // it was meant to end then we backdate it.
-        emit FairLaunchEnded(_poolKey.toId(), info.revenue, info.supply, info.endsAt);
+        emit FairLaunchEnded(_poolKey.toId(), info.revenue, info.initialSupply, info.remainingSupply, info.endsAt);
 
         return info;
     }
 
     /**
+     * @notice Function to buy in fairlaunch
      * When we are filling from our Fair Launch position, we will always be buying tokens
      * with ETH. The amount specified that is passed in, however, could be positive or negative.
      *
@@ -235,80 +250,68 @@ contract FairLaunch is AccessControl {
      *
      * @param _poolKey The PoolKey we are filling from
      * @param _amountSpecified The amount specified in the swap
-     * @param _nativeIsZero If our native token is `currency0`
      *
      * @return beforeSwapDelta_ The modified swap delta
      */
     function fillFromPosition(
-        PoolKey memory _poolKey,
+        PoolId memory poolId,
         int _amountSpecified,
-        bool _nativeIsZero
     )
         public
         onlyGemFotManager
-        returns (BeforeSwapDelta beforeSwapDelta_, BalanceDelta balanceDelta_, FairLaunchInfo memory fairLaunchInfo_)
+        returns (uint nativeIn, uint tokensOut, FairLaunchInfo memory fairLaunchInfo_)
     {
-        PoolId poolId = _poolKey.toId();
         FairLaunchInfo storage info = _fairLaunchInfo[poolId];
 
         // No tokens, no fun.
         if (_amountSpecified == 0) {
-            return (beforeSwapDelta_, balanceDelta_, info);
+            return (0, 0, info);
         }
 
-        uint nativeIn;
-        uint tokensOut;
+        uint sold = info.initialSupply - info.remainingSupply;
 
-        // If we have a negative amount specified, then we have an ETH amount passed in and want
-        // to buy as many tokens as we can for that price.
+        // If we have a negative amount specified, then we have an ETH amount passed in.
+        // Bonding curve exact input requires inverse calculation which is complex; assuming exact output.
         if (_amountSpecified < 0) {
-            nativeIn = uint(-_amountSpecified);
-            tokensOut = _getQuoteAtTick(
-                info.initialTick,
-                nativeIn,
-                Currency.unwrap(_nativeIsZero ? _poolKey.currency0 : _poolKey.currency1),
-                Currency.unwrap(_nativeIsZero ? _poolKey.currency1 : _poolKey.currency0)
-            );
+            revert("Exact input not supported for bonding curve");
         }
         // Otherwise, if we have a positive amount specified, then we know the number of tokens that
         // are being purchased and need to calculate the amount of ETH required.
         else {
             tokensOut = uint(_amountSpecified);
-            nativeIn = _getQuoteAtTick(
-                info.initialTick,
-                tokensOut,
-                Currency.unwrap(!_nativeIsZero ? _poolKey.currency0 : _poolKey.currency1),
-                Currency.unwrap(!_nativeIsZero ? _poolKey.currency1 : _poolKey.currency0)
+            
+            if (tokensOut > info.remainingSupply) {
+                tokensOut = info.remainingSupply;
+            }
+            
+            nativeIn = LinearBondingCurve.calculateBuyCost(
+                info.targetMarketCap,
+                info.initialSupply,
+                info.p0,
+                sold,
+                tokensOut
             );
+
         }
 
         // If the user has requested more tokens than are available in the fair launch, then we
         // need to strip back the amount that we can fulfill.
-        if (tokensOut > info.supply) {
+        if (tokensOut > info.remainingSupply) {
             // Calculate the percentage of tokensOut relative to the threshold and reduce the `nativeIn`
             // value by the same amount. There may be some slight accuracy loss, but it's all good.
-            uint percentage = info.supply * 1e18 / tokensOut;
+            uint percentage = info.remainingSupply * 1e18 / tokensOut;
             nativeIn = (nativeIn * percentage) / 1e18;
 
-            // Update our `tokensOut` to the supply limit
-            tokensOut = info.supply;
+            // Update our `tokensOut` to the remainingSupply limit
+            tokensOut = info.remainingSupply;
         }
 
-        // Get our BeforeSwapDelta response ready
-        beforeSwapDelta_ = (_amountSpecified < 0)
-            ? toBeforeSwapDelta(nativeIn.toInt128(), -tokensOut.toInt128())
-            : toBeforeSwapDelta(-tokensOut.toInt128(), nativeIn.toInt128());
-
-        // Define our BalanceDelta
-        balanceDelta_ = toBalanceDelta(
-            _nativeIsZero ? nativeIn.toInt128() : -tokensOut.toInt128(),
-            _nativeIsZero ? -tokensOut.toInt128() : nativeIn.toInt128()
-        );
 
         info.revenue += nativeIn;
-        info.supply -= tokensOut;
+        info.remainingSupply -= tokensOut;
+        emit FairLaunchBought(poolId, nativeIn, tokensOut, sold);
 
-        return (beforeSwapDelta_, balanceDelta_, info);
+        return (nativeIn, tokensOut, info);
     }
 
     /**
@@ -382,40 +385,7 @@ contract FairLaunch is AccessControl {
         }
     }
 
-    /**
-     * Given a tick and a token amount, calculates the amount of token received in exchange.
-     *
-     * @dev Forked from the `Uniswap/v3-periphery` {OracleLibrary} contract.
-     *
-     * @param _tick Tick value used to calculate the quote
-     * @param _baseAmount Amount of token to be converted
-     * @param _baseToken Address of an ERC20 token contract used as the baseAmount denomination
-     * @param _quoteToken Address of an ERC20 token contract used as the quoteAmount denomination
-     *
-     * @return quoteAmount_ Amount of quoteToken received for baseAmount of baseToken
-     */
-    function _getQuoteAtTick(
-        int24 _tick,
-        uint _baseAmount,
-        address _baseToken,
-        address _quoteToken
-    ) internal pure returns (uint quoteAmount_) {
-        uint160 sqrtPriceX96 = TickMath.getSqrtPriceAtTick(_tick);
 
-        // Calculate `quoteAmount` with better precision if it doesn't overflow when multiplied
-        // by itself.
-        if (sqrtPriceX96 <= type(uint128).max) {
-            uint ratioX192 = uint(sqrtPriceX96) * sqrtPriceX96;
-            quoteAmount_ = _baseToken < _quoteToken
-                ? FullMath.mulDiv(ratioX192, _baseAmount, 1 << 192)
-                : FullMath.mulDiv(1 << 192, _baseAmount, ratioX192);
-        } else {
-            uint ratioX128 = FullMath.mulDiv(sqrtPriceX96, sqrtPriceX96, 1 << 64);
-            quoteAmount_ = _baseToken < _quoteToken
-                ? FullMath.mulDiv(ratioX128, _baseAmount, 1 << 128)
-                : FullMath.mulDiv(1 << 128, _baseAmount, ratioX128);
-        }
-    }
 
     /**
      * Ensures that only a {GemFotManager} can call the function.

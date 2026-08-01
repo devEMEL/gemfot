@@ -8,11 +8,13 @@ functions to call/set after deploying all contracts (ask ai later, to make sure 
 
 -- check all setters like setSwapFeeThreshold etc and store them for reference.
 
+-- owner should call setP0 on fairLaunch.sol (how to set the range/curve though)
 -- (no need since its enabled by default) token creator calls setDisabledState with false to enable bidwall. (so memecoin treasury gets no fee)
 -- TOKEN CREATOR CAN DECIDE WHAT TO DO WITH TOKENS IN THE MEMECOIN TREASURY LATER
 -- (change in BidWall.sol) _swapFeeThreshold = 0.1 ether; // change from 0.1 to 200 usdc
 -- setSwapFeeThreshold (owner can also update it)
 
+-- owner calls setNotifierLaunch on Indexer.sol
 -- deploy ActionManager.sol and approve all treasury actions (deploy all) with approveAction(address action)
 -- token creator can call executeAction on MemecoinTreasury(action, data)..check the action contract to see how to encode data.
 

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {IFeeCalculator} from "@gemfot-interfaces/IFeeCalculator.sol";
 import {IInitialPrice} from "@gemfot-interfaces/IInitialPrice.sol";
 import {ILaunch} from "@gemfot-interfaces/ILaunch.sol";
 import {IMemecoin} from "@gemfot-interfaces/IMemecoin.sol";
@@ -35,6 +34,7 @@ import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 import {CurrencySettler} from "@uniswap/v4-core/test/utils/CurrencySettler.sol";
 import {BaseHook} from "v4-hooks-public/lib/v4-periphery/src/utils/BaseHook.sol";
 import {ModifyLiquidityParams, SwapParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
+import {LinearBondingCurve} from "@gemfot/libraries/LinearBondingCurve.sol";
 
 
 /**
@@ -160,7 +160,6 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
      * @custom:member creatorFeeAllocation The percentage of fees the creators wants to take from the BidWall
      * @custom:member launchAt The timestamp at which the token will launch
      * @custom:member initialPriceParams The encoded parameters for the Initial Price logic
-     * @custom:member feeCalculatorParams The encoded parameters for the fee calculator
      */
     struct LaunchParams {
         string name;
@@ -172,8 +171,7 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
         address creator;
         uint24 creatorFeeAllocation;
         uint launchAt;
-        bytes initialPriceParams;
-        bytes feeCalculatorParams;
+        bytes initialPriceParams; //(totalSupply, usdcMarketCap, targetRaise)
     }
 
     /// The minimum amount before a distribution is triggered
@@ -190,6 +188,7 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
 
     /// Internal storage to allow the `beforeSwap` tick value to be used in `afterSwap`
     int24 internal _beforeSwapTick;
+
 
     /// Store the address that will collect protocol fees
     address internal protocolFeeRecipient;
@@ -212,6 +211,8 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
 
     /// Store the block timestamp when a poolId is set to launch
     mapping(PoolId _poolId => uint _launchTime) public launchesAt;
+
+    mapping(PoolId _poolId => uint p0) public poolP0;
 
     /**
      * Initializes our {BaseHook} contract and initializes all implemented hooks.
@@ -279,6 +280,8 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
             hooks: IHooks(address(this))
         });
 
+
+
         // Initialize the {MemecoinTreasury} with `PoolKey`
         MemecoinTreasury(memecoinTreasury)
             .initialize(payable(address(this)), address(actionManager), nativeToken, _poolKey);
@@ -287,19 +290,13 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
         _poolKeys[memecoin_] = _poolKey;
         PoolId poolId = _poolKey.toId();
 
+        uint p0 = LinearBondingCurve.computeP0(params.usdcMarketCap, params.targetRaise, _params.initialTokenFairLaunch);
+
         // If we have a non-zero creator fee allocation, then we need to update our creator's
         // fee allocation.
         if (_params.creatorFeeAllocation != 0) {
             creatorFee[poolId] = _params.creatorFeeAllocation;
         }
-
-        // Initialize all fee calculators attached to the pool, along with any custom parameters
-        _initializeFeeCalculators(poolId, _params.feeCalculatorParams);
-
-        // Initialize our memecoin with the sqrtPriceX96
-        int24 initialTick = poolManager.initialize(
-            _poolKey, initialPrice.getSqrtPriceX96(msg.sender, currencyFlipped, _params.initialPriceParams)
-        );
 
         // Check if we have an initial launching fee, check that enough ETH has been sent
         uint launchFee = getLaunchingFee(_params.initialPriceParams);
@@ -336,13 +333,15 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
         // Regardless of having a fair launch, we need to call `createPosition` as this
         // instantiates our storage struct that is required for when the position is closed
         // and the tokens are moved to a Uniswap V4 liquidity position.
+           
         fairLaunch.createPosition({
             _poolId: poolId,
-            _initialTick: initialTick,
             _launchesAt: _params.launchAt > block.timestamp ? _params.launchAt : block.timestamp,
             _initialTokenFairLaunch: _params.initialTokenFairLaunch,
-            _tokenTotalSupply: params.totalSupply,
-            _fairLaunchDuration: _params.fairLaunchDuration
+            _fairLaunchDuration: _params.fairLaunchDuration,
+            _targetMarketCap: params.usdcMarketCap,
+            _targetRaise: params.targetRaise,
+            _p0: p0
         });
 
         /**
@@ -368,11 +367,13 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
             nativeToken.safeTransferFrom(msg.sender, protocolFeeRecipient, launchFee);
         }
 
-        // After our contract is initialized, we mark our pool as initialized and emit
-        // our state update to notify the UX of current prices, etc. This will include
-        // optional liquidity modifications from the Fair Launch logic.
-        _emitPoolStateUpdate(poolId, IHooks.afterInitialize.selector, abi.encode(tokenId, _params));
+
+        // Notify our subscribed contracts
+        notifier.notifySubscribers(poolId, IHooks.afterInitialize.selector, abi.encode(tokenId, _params));
+ 
     }
+
+    
 
     /**
      * Returns the PoolKey mapped to the token address. If none is set then a zero value
@@ -528,7 +529,7 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
                 // Creator missed their premine — clear tstore; tokens are burned with unsold FL supply below
                 _clearUnusedPremine(poolId);
 
-                uint unsoldSupply = fairLaunchInfo.supply;
+                uint unsoldSupply = fairLaunchInfo.remainingSupply;
 
                 // closes the fair launch position, putting remaining memecoin supply into the liquidity pool
                 // minus the unsold fair launch supply, which is burned
@@ -601,7 +602,7 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
             BalanceDelta fairLaunchFillDelta;
             BeforeSwapDelta fairLaunchBeforeSwapDelta;
             (fairLaunchBeforeSwapDelta, fairLaunchFillDelta, fairLaunchInfo) =
-                fairLaunch.fillFromPosition(_key, amountRemaining, nativeIsZero);
+                fairLaunch.fillFromPosition(poolId..., amountRemaining,);
 
             // Give the tokens to Uniswap V4 so that it can play good-cop and give them to the user
             _settleDelta(_key, fairLaunchFillDelta);
@@ -715,19 +716,7 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
 
         _distributeFees(_key);
 
-        /**
-         * [FD] If we have a feeCalculator, then we want to track the swap data for any
-         * dynamic calculations.
-         */
-
         PoolId poolId = _key.toId();
-
-        {
-            IFeeCalculator _feeCalculator = getFeeCalculator(fairLaunch.inFairLaunchWindow(poolId));
-            if (address(_feeCalculator) != address(0)) {
-                _feeCalculator.trackSwap(_sender, _key, _params, _delta, _hookData);
-            }
-        }
 
         // Set our return selector
         hookDeltaUnspecified_ = swapFee.toInt128();
@@ -904,6 +893,8 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
         emit PoolStateUpdated(_poolId, sqrtPriceX96, tick, protocolFee, swapFee, poolManager.getLiquidity(_poolId));
     }
 
+
+
     /**
      * Allows the contract used to launch a new token to be updated.
      *
@@ -969,7 +960,6 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
             _poolManager: poolManager,
             _key: _key,
             _params: _params,
-            _feeCalculator: getFeeCalculator(fairLaunch.inFairLaunchWindow(_key.toId())),
             _swapFeeCurrency: swapFeeCurrency,
             _swapAmount: uint128(_delta < 0 ? -_delta : _delta),
             _feeExemption: feeExemptions.feeExemption(_sender)

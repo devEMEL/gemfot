@@ -11,10 +11,6 @@ interface IInitialPrice {
         bytes calldata _initialPriceParams
     ) external view returns (uint);
 
-    function getMarketCap(
-        bytes calldata _initialPriceParams
-    ) external view returns (uint);
-
     function getSqrtPriceX96(
         address _sender,
         bool _flipped,

@@ -12,6 +12,7 @@ import {TokenSupply} from "../libraries/TokenSupply.sol"; // Adjust path based o
 
 import {IInitialPrice} from "../../interfaces/IInitialPrice.sol"; // Adjust path based on directory structure
 import {MarketCappedPriceParams} from "@gemfot/types/USDCMarketCappedPrice.sol";
+import {LinearBondingCurve} from "../libraries/LinearBondingCurve.sol";
 
 /**
  * @title USDCMarketCappedPrice
@@ -85,74 +86,10 @@ contract USDCMarketCappedPrice is IInitialPrice, Ownable {
         return params.usdcMarketCap / 10000; // instead of 1000, just for testnet purposes.
     }
 
-    /**
-     * @notice Returns the target market cap in USDC directly.
-     *
-     * @param _initialPriceParams Parameters for the initial pricing
-     * @return The USDC value of the market cap
-     */
-    function getMarketCap(
-        bytes calldata _initialPriceParams
-    ) public view returns (uint) {
-        (MarketCappedPriceParams memory params) = abi.decode(_initialPriceParams, (MarketCappedPriceParams));
 
-        // Ensure that our requested market cap is sufficient
-        if (params.usdcMarketCap < MINIMUM_USDC_MARKET_CAP) {
-            revert MarketCapTooSmall(params.usdcMarketCap, MINIMUM_USDC_MARKET_CAP);
-        }
-
-        return params.usdcMarketCap;
-    }
 
     /**
-     * @notice Computes the Uniswap V4 sqrtPriceX96 for the pool based on target USDC market cap.
-     *
-     * @param _flipped If the PoolKey currencies are flipped
-     * @param _initialPriceParams Parameters for the initial pricing
-     *
-     * @return sqrtPriceX96_ The `sqrtPriceX96` value
-     */
-    function getSqrtPriceX96(
-        address,
-        /* _sender */
-        bool _flipped,
-        bytes calldata _initialPriceParams
-    ) public view virtual returns (uint160 sqrtPriceX96_) {
-        (MarketCappedPriceParams memory params) = abi.decode(_initialPriceParams, (MarketCappedPriceParams));
-        // Since native token is USDC, the target valuation is simply the market cap amount
-        uint usdcAmount = getMarketCap(_initialPriceParams);
-
-        return _calculateSqrtPriceX96(usdcAmount, params.totalSupply, !_flipped);
-    }
-
-    /**
-     * @notice Calculates a sqrtPriceX96 based on USDC and Memecoin amounts.
-     *
-     * @param _usdcAmount The amount of USDC for the pool
-     * @param _tokenAmount The number of tokens for the pool
-     * @param _isUsdcToken0 If USDC will be token0
-     *
-     * @return sqrtPriceX96_ The calculated sqrtPriceX96 value
-     */
-    function _calculateSqrtPriceX96(
-        uint _usdcAmount,
-        uint _tokenAmount,
-        bool _isUsdcToken0
-    ) internal pure returns (uint160 sqrtPriceX96_) {
-        require(_usdcAmount > 0 && _tokenAmount > 0, "Amounts must be greater than zero");
-
-        // Calculate the price ratio depending on token order
-        if (_isUsdcToken0) {
-            // USDC is token0, TOKEN is token1
-            return uint160(_sqrt(FullMath.mulDiv(_tokenAmount, 1 << 192, _usdcAmount)));
-        }
-
-        // TOKEN is token0, USDC is token1
-        return uint160(_sqrt(FullMath.mulDiv(_usdcAmount, 1 << 192, _tokenAmount)));
-    }
-
-    /**
-     * Helper function for square root.
+     * @notice Helper function for square root.
      */
     function _sqrt(
         uint _x
@@ -167,6 +104,65 @@ contract USDCMarketCappedPrice is IInitialPrice, Ownable {
             z = (_x / z + z) / 2;
         }
     }
+
+    /**
+     * @notice Computes the current token price given the bonding curve parameters.
+     */
+    function getPricing(
+        uint256 usdcMarketCap,
+        uint256 totalSupply,
+        uint p0,
+        uint256 sold
+    ) public pure returns (uint256) {
+        return LinearBondingCurve.currentPrice(usdcMarketCap, totalSupply, p0, sold);
+    }
+    
+
+    /**
+     * @notice Computes the Uniswap V4 sqrtPriceX96 given token reserves and decimals.
+     */
+    // function encodeSqrtPrice(
+    //     uint256 a,
+    //     uint256 b,
+    //     uint8 aDecimals,
+    //     uint8 bDecimals
+    // ) public pure returns (uint160) {
+    //     // Adjust for decimal differences to find the true ratio
+    //     // If a has 18 decimals and b has 6, then 1 token A = 10^18 base units, 1 token B = 10^6 base units.
+    //     // The price of A in terms of B is (b * 10^aDecimals) / (a * 10^bDecimals)
+    //     // sqrtPriceX96 = sqrt(b * 10^aDecimals / (a * 10^bDecimals)) * 2^96
+        
+    //     uint256 bAdjusted = b;
+    //     uint256 aAdjusted = a;
+        
+    //     if (aDecimals > bDecimals) {
+    //         bAdjusted = b * (10 ** (aDecimals - bDecimals));
+    //     } else if (bDecimals > aDecimals) {
+    //         aAdjusted = a * (10 ** (bDecimals - aDecimals));
+    //     }
+        
+    //     return uint160(_sqrt(FullMath.mulDiv(bAdjusted, 1 << 192, aAdjusted)));
+    // }
+
+
+
+    /**
+     * @notice Computes the Uniswap V4 sqrtPriceX96 given two already-raw, equivalent-value amounts.
+     * @param a Raw base-unit amount of token A (e.g. 1e18 for 1 whole 18-decimal token)
+     * @param b Raw base-unit amount of token B representing the equivalent value (e.g. priceRaw in 6-decimal USDC)
+     * @return sqrtPriceX96 The Uniswap V4-compatible sqrt price, Q64.96 format
+     */
+    function encodeSqrtPrice(
+        uint256 a,
+        uint256 b
+    ) public pure returns (uint160) {
+        // Both a and b are already raw, equivalent-value amounts — no decimal adjustment needed.
+        // price = b / a
+        // sqrtPriceX96 = sqrt(b / a) * 2^96
+        return uint160(_sqrt(FullMath.mulDiv(b, 1 << 192, a)));
+    }
+
+
 
     /**
      * Allows the `launchFeeThreshold` to be updated.

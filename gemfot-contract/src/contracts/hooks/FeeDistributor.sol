@@ -12,7 +12,6 @@ import {FeeEscrow} from "@gemfot/escrows/FeeEscrow.sol";
 import {FeeExemptions} from "@gemfot/hooks/FeeExemptions.sol";
 import {MemecoinFinder} from "@gemfot/types/MemecoinFinder.sol";
 
-import {IFeeCalculator} from "@gemfot-interfaces/IFeeCalculator.sol";
 import {SwapParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -36,11 +35,6 @@ abstract contract FeeDistributor is Ownable {
     /// Emitted when our `FeeDistribution` struct is modified for a pool
     event PoolFeeDistributionUpdated(PoolId indexed _poolId, FeeDistribution _feeDistribution);
 
-    /// Emitted when our {FeeCalculator} contract is updated
-    event FeeCalculatorUpdated(address _feeCalculator);
-
-    /// Emitted when our FairLaunch {FeeCalculator} contract is updated
-    event FairLaunchFeeCalculatorUpdated(address _feeCalculator);
 
     /// Emitted when a pool's creator fee allocation is updated
     event CreatorFeeAllocationUpdated(PoolId indexed _poolId, uint24 _allocation);
@@ -86,10 +80,6 @@ abstract contract FeeDistributor is Ownable {
 
     /// The {FeeEscrow} contract that will be used
     FeeEscrow public feeEscrow;
-
-    /// The {IFeeCalculator} used to calculate swap fees
-    IFeeCalculator public feeCalculator;
-    IFeeCalculator public fairLaunchFeeCalculator;
 
     /// Our internal native token
     address public nativeToken;
@@ -151,7 +141,6 @@ abstract contract FeeDistributor is Ownable {
      * @param _poolManager The Uniswap V4 {PoolManager}
      * @param _key The key for the pool being swapped against
      * @param _params The swap parameters called in the swap
-     * @param _feeCalculator The fee calculator to use for calculations
      * @param _swapFeeCurrency The currency that the fee will be paid in
      * @param _swapAmount The amount of the swap to take fees from
      * @param _feeExemption The optional fee exemption that can overwrite
@@ -162,7 +151,6 @@ abstract contract FeeDistributor is Ownable {
         IPoolManager _poolManager,
         PoolKey calldata _key,
         SwapParams memory _params,
-        IFeeCalculator _feeCalculator,
         Currency _swapFeeCurrency,
         uint _swapAmount,
         FeeExemptions.FeeExemption memory _feeExemption
@@ -172,14 +160,8 @@ abstract contract FeeDistributor is Ownable {
             return swapFee_;
         }
 
-        // Get our base swapFee from the FeeCalculator. If we don't have a feeCalculator
         // set, then we need to just use our base rate.
         uint24 baseSwapFee = getPoolFeeDistribution(_key.toId()).swapFee;
-
-        // Check if we have a {FeeCalculator} attached to calculate the fee
-        if (address(_feeCalculator) != address(0)) {
-            baseSwapFee = _feeCalculator.determineSwapFee(_key, _params, baseSwapFee);
-        }
 
         // If we have a swap fee override, then we want to use that value, only if it is
         // less than the traditionally calculated base swap fee.
@@ -308,30 +290,6 @@ abstract contract FeeDistributor is Ownable {
         }
     }
 
-    /**
-     * Allows an owner to update the {IFeeCalculator} used to determine the swap fee.
-     *
-     * @param _feeCalculator The new {IFeeCalculator} to use
-     */
-    function setFeeCalculator(
-        IFeeCalculator _feeCalculator
-    ) public onlyOwner {
-        feeCalculator = _feeCalculator;
-        emit FeeCalculatorUpdated(address(_feeCalculator));
-    }
-
-    /**
-     * Allows an owner to update the {IFeeCalculator} used during FairLaunch to determine the
-     * swap fee.
-     *
-     * @param _feeCalculator The new {IFeeCalculator} to use
-     */
-    function setFairLaunchFeeCalculator(
-        IFeeCalculator _feeCalculator
-    ) public onlyOwner {
-        fairLaunchFeeCalculator = _feeCalculator;
-        emit FairLaunchFeeCalculatorUpdated(address(_feeCalculator));
-    }
 
     /**
      * Gets the distribution for a pool by checking to see if a pool has it's own FeeDistribution. If
@@ -347,51 +305,7 @@ abstract contract FeeDistributor is Ownable {
         feeDistribution_ = (poolFeeDistribution[_poolId].active) ? poolFeeDistribution[_poolId] : feeDistribution;
     }
 
-    /**
-     * Gets the {IFeeCalculator} contract that should be used based on which are set, and if the
-     * pool is currently in FairLaunch or not.
-     *
-     * @dev This could return a zero address if no fee calculators have been set
-     *
-     * @param _isFairLaunch If the pool is currently in FairLaunch
-     *
-     * @return IFeeCalculator The IFeeCalculator to use
-     */
-    function getFeeCalculator(
-        bool _isFairLaunch
-    ) public view returns (IFeeCalculator) {
-        if (_isFairLaunch && address(fairLaunchFeeCalculator) != address(0)) {
-            return fairLaunchFeeCalculator;
-        }
 
-        return feeCalculator;
-    }
-
-    /**
-     * Initializes both the Fair Launch and Standard {IFeeCalculator} gemfoting parameters for a pool.
-     *
-     * @param _poolId The PoolId being updated
-     * @param _feeCalculatorParams The parameters to pass to the fee calculators
-     */
-    function _initializeFeeCalculators(
-        PoolId _poolId,
-        bytes calldata _feeCalculatorParams
-    ) internal {
-        // Check if we have a fair launch calculator assigned. If we do, then we want to register
-        // any custom parameters that have been passed.
-        IFeeCalculator fairLaunchCalculator = getFeeCalculator(true);
-        if (address(fairLaunchCalculator) != address(0)) {
-            fairLaunchCalculator.setLaunchParams(_poolId, _feeCalculatorParams);
-        }
-
-        // Check if we have a standard calculator assigned that is different to the fair launch
-        // calculator. If we do, then we want to register any custom parameters that have been
-        // passed.
-        IFeeCalculator standardCalculator = getFeeCalculator(false);
-        if (address(standardCalculator) != address(fairLaunchCalculator)) {
-            standardCalculator.setLaunchParams(_poolId, _feeCalculatorParams);
-        }
-    }
 
     /**
      * Allows the contract to receive ETH when withdrawn from the flETH token.
