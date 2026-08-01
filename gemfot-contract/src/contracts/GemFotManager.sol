@@ -278,7 +278,7 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
             fee: 0,
             tickSpacing: 60,
             hooks: IHooks(address(this))
-        });
+        }); // use this to reconstruct poolkey in our indexer
 
 
 
@@ -472,89 +472,17 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
         BeforeSwapDelta beforeSwapDelta_,
         uint24
     ) {
-        /**
-         * [SCHEDULE][PREMINE] Creators pass their address in hookData (`abi.encode(user)`).
-         * Premine amount is set at launch via tstore (line ~320) and is already included in
-         * FairLaunch supply — no addSupply. On success or expiry, clear tstore.
-         */
         PoolId poolId = _key.toId();
         bool nativeIsZero = nativeToken == Currency.unwrap(_key.currency0);
-        address swapper = _resolveSwapper(_sender, _hookData);
-        int premineAmount = _tload(PoolId.unwrap(poolId));
-        bool isCreatorPremine;
-
-        if (premineAmount != 0) {
-            // Exact-output buy of the reserved premine by the token creator
-            isCreatorPremine = swapper == _key.memecoin(nativeToken).creator()
-                && _params.amountSpecified == premineAmount
-                && nativeIsZero == _params.zeroForOne;
-
-            if (isCreatorPremine) {
-                emit PoolPremine(poolId, premineAmount);
-                // Clear premine claim so it cannot be reused
-                assembly {
-                    tstore(poolId, 0)
-                }
-            }
-        }
-
-        {
-            uint _launchesAt = launchesAt[poolId];
-            if (_launchesAt != 0) {
-                if (!isCreatorPremine) {
-                    // If the timestamp has not yet passed, then we revert
-                    if (_launchesAt > block.timestamp) {
-                        revert TokenNotLaunched(_launchesAt);
-                    }
-
-                    // Remove the schedule timestamp to prevent future checks
-                    delete launchesAt[poolId];
-                }
-            }
-        }
 
         // Remaining amount for FairLaunch / Uniswap after ISP fills first
         int amountRemaining = _params.amountSpecified;
 
         // Check if our fair launch period hasn't ended and already been processed
         FairLaunch.FairLaunchInfo memory fairLaunchInfo = fairLaunch.fairLaunchInfo(poolId);
-        bool inActiveFairLaunch;
 
         if (!fairLaunchInfo.closed) {
-            /**
-             * [FL] If it's not premine, and the FairLaunch window has ended, but our position is still open, then we
-             * need to close the position. Clear and forfeit any unused creator premine (burned with unsold supply).
-             */
-            if (!isCreatorPremine && !fairLaunch.inFairLaunchWindow(poolId)) {
-                // Creator missed their premine — clear tstore; tokens are burned with unsold FL supply below
-                _clearUnusedPremine(poolId);
-
-                uint unsoldSupply = fairLaunchInfo.remainingSupply;
-
-                // closes the fair launch position, putting remaining memecoin supply into the liquidity pool
-                // minus the unsold fair launch supply, which is burned
-                fairLaunch.closePosition({
-                    _poolKey: _key,
-                    _tokenFees: _poolFees[poolId].amount1,
-                    _nativeIsZero: nativeIsZero
-                });
-
-                // burn the unsold fair launch supply (includes any unused premine)
-                if (unsoldSupply != 0) {
-                    (nativeIsZero ? _key.currency1 : _key.currency0).transfer(BURN_ADDRESS, unsoldSupply);
-                    emit FairLaunchBurn(poolId, unsoldSupply);
-                }
-            } else {
-                /**
-                 * [FL] If we are still in the FairLaunch window, then we need to prevent any swaps that
-                 * are specified to sell the {Memecoin}.
-                 */
-                if (nativeIsZero != _params.zeroForOne) {
-                    revert FairLaunch.CannotSellTokenDuringFairLaunch();
-                }
-
-                inActiveFairLaunch = true;
-            }
+            revert("Fair launch must be closed before Uniswap swaps");
         }
 
         /**
@@ -592,59 +520,6 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
             amountRemaining = _params.amountSpecified >= 0
                 ? amountRemaining - int(tokenOut)
                 : amountRemaining + int(tokenIn);
-        }
-
-        /**
-         * [FL] Fill any remaining amount from the FairLaunch position after ISP.
-         * Creator premine is sold here from existing FairLaunch supply.
-         */
-        if (inActiveFairLaunch && amountRemaining != 0) {
-            BalanceDelta fairLaunchFillDelta;
-            BeforeSwapDelta fairLaunchBeforeSwapDelta;
-            (fairLaunchBeforeSwapDelta, fairLaunchFillDelta, fairLaunchInfo) =
-                fairLaunch.fillFromPosition(poolId..., amountRemaining,);
-
-            // Give the tokens to Uniswap V4 so that it can play good-cop and give them to the user
-            _settleDelta(_key, fairLaunchFillDelta);
-
-            /**
-             * [FD] We need to determine the amount of fees generated by our fair launch swap to
-             * capture, rather than sending the full amount to the end user.
-             */
-            uint swapFee = _captureAndDepositFees(
-                _key, _params, _sender, fairLaunchBeforeSwapDelta.getUnspecifiedDelta(), _hookData
-            );
-
-            // Increment our swap
-            _captureDelta(_params, TS_FL_AMOUNT0, TS_FL_AMOUNT1, fairLaunchBeforeSwapDelta);
-            _captureDeltaSwapFee(_params, TS_FL_FEE0, TS_FL_FEE1, swapFee);
-
-            // Combine ISP + FairLaunch deltas
-            beforeSwapDelta_ = toBeforeSwapDelta(
-                beforeSwapDelta_.getSpecifiedDelta() + fairLaunchBeforeSwapDelta.getSpecifiedDelta(),
-                beforeSwapDelta_.getUnspecifiedDelta() + fairLaunchBeforeSwapDelta.getUnspecifiedDelta()
-                    + swapFee.toInt128()
-            );
-
-            // A FairLaunch transaction will always facilitate purchasing Memecoin with
-            // Native Token. This means that if the `amountSpecified` not negative, then we will
-            // have captured the fee in Native Token and as such we need to reduce the amount of
-            // revenue that we record.
-            if (amountRemaining >= 0 && swapFee != 0) {
-                fairLaunch.modifyRevenue(poolId, -swapFee.toInt128());
-            }
-
-            // If we have run out of tokens, then we can close the pool
-            if (fairLaunchInfo.supply == 0) {
-                // Sold out before creator bought — forfeit premine claim and clear tstore
-                _clearUnusedPremine(poolId);
-
-                fairLaunch.closePosition({
-                    _poolKey: _key,
-                    _tokenFees: _poolFees[poolId].amount1,
-                    _nativeIsZero: nativeIsZero
-                });
-            }
         }
 
         // Capture the beforeSwap tick value before actioning our Uniswap swap
@@ -730,6 +605,116 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
         _emitPoolStateUpdate(poolId, selector_, abi.encode(_sender, _params, _delta));
     }
 
+
+    /**
+     * @notice Allows users to buy tokens directly from the fair launch bonding curve
+     * @param _key The PoolKey for the token pool
+     * @param _tokensToBuy The exact amount of memecoins to buy
+     */
+    function buyFairLaunch(
+        PoolKey calldata _key,
+        uint256 _tokensToBuy
+    ) external {
+        PoolId poolId = _key.toId();
+        
+        if (!fairLaunch.inFairLaunchWindow(poolId)) {
+            revert FairLaunch.FairLaunchWindowHasClosed();
+        }
+
+        uint _launchesAt = launchesAt[poolId];
+        if (_launchesAt != 0) {
+            int premineAmount = _tload(PoolId.unwrap(poolId));
+            address memecoinAddress = Currency.unwrap(_key.currency0) == nativeToken ? Currency.unwrap(_key.currency1) : Currency.unwrap(_key.currency0);
+            
+            bool isCreatorPremine = premineAmount > 0 
+                && msg.sender == IMemecoin(memecoinAddress).creator();
+
+            if (isCreatorPremine) {
+                require(_tokensToBuy <= uint256(premineAmount), "Exceeds premine allocation");
+                int newPremine = premineAmount - int256(_tokensToBuy);
+                emit PoolPremine(poolId, int256(_tokensToBuy));
+                assembly { tstore(poolId, newPremine) }
+            } else {
+                if (_launchesAt > block.timestamp) {
+                    revert TokenNotLaunched(_launchesAt);
+                }
+                delete launchesAt[poolId];
+            }
+        }
+
+        // 1. Calculate native cost from the bonding curve
+        (uint nativeIn, uint tokensOut, FairLaunch.FairLaunchInfo memory info) = fairLaunch.fillFromPosition(
+            poolId,
+            int256(_tokensToBuy)
+        );
+
+        if (tokensOut == 0) {
+            revert("No tokens available");
+        }
+
+        // 2. Calculate swap fee
+        uint24 baseSwapFee = getPoolFeeDistribution(poolId).swapFee;
+        uint swapFee = (nativeIn * baseSwapFee) / ONE_HUNDRED_PERCENT;
+        uint totalToPay = nativeIn + swapFee;
+
+        // 3. Transfer native token from user to this contract
+        IERC20(nativeToken).safeTransferFrom(msg.sender, address(this), totalToPay);
+
+        // 4. Deposit fee internally
+        if (swapFee > 0) {
+            if (Currency.unwrap(_key.currency0) == nativeToken) {
+                _depositFees(_key, swapFee, 0);
+            } else {
+                _depositFees(_key, 0, swapFee);
+            }
+        }
+
+        // 5. Transfer purchased memecoins to user
+        address memecoin = Currency.unwrap(_key.currency0) == nativeToken ? Currency.unwrap(_key.currency1) : Currency.unwrap(_key.currency0);
+        IERC20(memecoin).safeTransfer(msg.sender, tokensOut);
+
+        // 6. Distribute fees
+        _distributeFees(_key);
+
+        // 7. Check if fair launch is complete (sold out or window closed) and close position
+        if (info.remainingSupply == 0 || !fairLaunch.inFairLaunchWindow(poolId)) {
+            closeExpiredFairLaunch(_key);
+        }
+    }
+
+    /**
+     * @notice Allows closing a fair launch position (when sold out or expired) and initializing the pool.
+     */
+    function closeExpiredFairLaunch(PoolKey calldata _key) public {
+        PoolId poolId = _key.toId();
+        FairLaunch.FairLaunchInfo memory info = fairLaunch.fairLaunchInfo(poolId);
+        
+        require(!info.closed, "Already closed");
+        require(info.remainingSupply == 0 || !fairLaunch.inFairLaunchWindow(poolId), "Fair launch still active");
+        
+        _clearUnusedPremine(poolId);
+        bool nativeIsZero = Currency.unwrap(_key.currency0) == nativeToken;
+        
+        uint unsoldSupply = info.remainingSupply;
+
+        // Burn remaining supply
+        if (unsoldSupply != 0) {
+            (nativeIsZero ? _key.currency1 : _key.currency0).transfer(BURN_ADDRESS, unsoldSupply);
+            emit FairLaunchBurn(poolId, unsoldSupply);
+        }
+        
+        // Calculate final price using MarketCappedPrice logic
+        uint sold = info.initialSupply - unsoldSupply;
+        uint priceRaw = initialPrice.getPricing(info.targetMarketCap, info.initialSupply, info.p0, sold);
+        uint160 sqrtPriceX96 = initialPrice.encodeSqrtPrice(1e18, priceRaw);
+        
+
+        fairLaunch.closePosition({
+            _poolKey: _key,
+            _tokenFees: _poolFees[poolId].amount1,
+            _nativeIsZero: nativeIsZero,
+        });
+    }
 
     /**
      * Updates the `IInitialPrice` contract address that is used during `launch` to calculate

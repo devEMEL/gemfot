@@ -179,7 +179,6 @@ contract FairLaunch is AccessControl {
         PoolKey memory _poolKey,
         uint _tokenFees,
         bool _nativeIsZero,
-        int24 _initialTick
     ) public onlyGemFotManager returns (FairLaunchInfo memory) {
         // Reference the pool's FairLaunchInfo, ready to store updated values
         FairLaunchInfo storage info = _fairLaunchInfo[_poolKey.toId()];
@@ -254,8 +253,8 @@ contract FairLaunch is AccessControl {
      * @return beforeSwapDelta_ The modified swap delta
      */
     function fillFromPosition(
-        PoolId memory poolId,
-        int _amountSpecified,
+        PoolId poolId,
+        int _amountSpecified
     )
         public
         onlyGemFotManager
