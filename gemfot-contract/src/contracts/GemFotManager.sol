@@ -658,7 +658,7 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
         uint totalToPay = nativeIn + swapFee;
 
         // 3. Transfer native token from user to this contract
-        IERC20(nativeToken).safeTransferFrom(msg.sender, address(this), totalToPay);
+        nativeToken.safeTransferFrom(msg.sender, address(this), totalToPay);
 
         // 4. Deposit fee internally
         if (swapFee > 0) {
@@ -671,7 +671,7 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
 
         // 5. Transfer purchased memecoins to user
         address memecoin = Currency.unwrap(_key.currency0) == nativeToken ? Currency.unwrap(_key.currency1) : Currency.unwrap(_key.currency0);
-        IERC20(memecoin).safeTransfer(msg.sender, tokensOut);
+        memecoin.safeTransfer(msg.sender, tokensOut);
 
         // 6. Distribute fees
         _distributeFees(_key);

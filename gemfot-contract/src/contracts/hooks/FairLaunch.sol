@@ -43,6 +43,7 @@ contract FairLaunch is AccessControl {
     error CannotModifyLiquidityDuringFairLaunch();
     error CannotSellTokenDuringFairLaunch();
     error NotGemFotManager();
+    error FairLaunchWindowHasClosed();
 
     /// Emitted when a Fair Launch position is created
     event FairLaunchCreated(PoolId indexed _poolId, uint _tokens, uint _startsAt, uint _endsAt);
@@ -173,7 +174,7 @@ contract FairLaunch is AccessControl {
      * @param _poolKey The PoolKey we are closing the FairLaunch position of
      * @param _tokenFees The amount of token fees that need to remain in the {GemFotManager}
      * @param _nativeIsZero If our native token is `currency0`
-     * @param _initialTick The tick where the position should be created
+     * @param _sqrtPriceX96 The _sqrtPriceX96 where the position should be created
      */
     function closePosition(
         PoolKey memory _poolKey,
@@ -202,7 +203,7 @@ contract FairLaunch is AccessControl {
                 _poolKey,
                 tickLower,
                 tickUpper,
-                _poolKey.currency1.balanceOf(msg.sender) - _tokenFees - info.remainingSupply,
+                _poolKey.currency1.balanceOf(msg.sender) - _tokenFees,
                 false
             );
         } else {
@@ -218,7 +219,7 @@ contract FairLaunch is AccessControl {
                 _poolKey,
                 tickLower,
                 tickUpper,
-                _poolKey.currency0.balanceOf(msg.sender) - _tokenFees - info.remainingSupply,
+                _poolKey.currency0.balanceOf(msg.sender) - _tokenFees,
                 true
             );
         }
@@ -250,10 +251,12 @@ contract FairLaunch is AccessControl {
      *
      * @dev `zeroForOne` will always be equal to `_nativeIsZero` as it will always be ETH -> Token.
      *
-     * @param _poolKey The PoolKey we are filling from
+     * @param poolId The PoolId we are filling from
      * @param _amountSpecified The amount specified in the swap
      *
-     * @return beforeSwapDelta_ The modified swap delta
+     * @return nativeIn The amount of native token user pays 
+     * @return tokensOut The amount of tokens user wants to buy 
+     * @return fairLaunchInfo_ The token fairLaunch info 
      */
     function fillFromPosition(
         PoolId poolId,

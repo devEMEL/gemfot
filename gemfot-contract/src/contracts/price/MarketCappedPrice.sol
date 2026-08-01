@@ -7,10 +7,9 @@ import {FullMath} from "@uniswap/v4-core/src/libraries/FullMath.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 
-import {LaunchFeeExemption} from "../price/LaunchFeeExemption.sol"; // Adjust path based on directory structure
-import {TokenSupply} from "../libraries/TokenSupply.sol"; // Adjust path based on directory structure
+import {LaunchFeeExemption} from "../price/LaunchFeeExemption.sol"; 
+import {TokenSupply} from "../libraries/TokenSupply.sol"; 
 
-import {IInitialPrice} from "../../interfaces/IInitialPrice.sol"; // Adjust path based on directory structure
 import {MarketCappedPriceParams} from "@gemfot/types/USDCMarketCappedPrice.sol";
 import {LinearBondingCurve} from "../libraries/LinearBondingCurve.sol";
 
@@ -23,7 +22,7 @@ import {LinearBondingCurve} from "../libraries/LinearBondingCurve.sol";
  * an oracle pool to convert ETH/USDC. The market cap input directly represents
  * the native token (USDC) amount.
  */
-contract USDCMarketCappedPrice is IInitialPrice, Ownable {
+contract USDCMarketCappedPrice is Ownable {
     using PoolIdLibrary for PoolKey;
 
     error MarketCapTooSmall(uint _usdcMarketCap, uint _usdcMarketCapMinimum);
@@ -73,9 +72,9 @@ contract USDCMarketCappedPrice is IInitialPrice, Ownable {
         }
 
         // If the fee is below our set threshold, then we want to exclude the fee
-        if (params.usdcMarketCap <= launchFeeThreshold) {
-            return 0;
-        }
+        // if (params.usdcMarketCap <= launchFeeThreshold) {
+        //     return 0;
+        // }
 
         // Check if our `_sender` is fee excluded
         if (launchFeeExemption.feeExcluded(_sender)) {
