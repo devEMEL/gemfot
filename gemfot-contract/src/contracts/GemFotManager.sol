@@ -706,13 +706,20 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
         // Calculate final price using MarketCappedPrice logic
         uint sold = info.initialSupply - unsoldSupply;
         uint priceRaw = initialPrice.getPricing(info.targetMarketCap, info.initialSupply, info.p0, sold);
-        uint160 sqrtPriceX96 = initialPrice.encodeSqrtPrice(1e18, priceRaw);
         
+        // token0 = a, token1 = b
+        uint160 sqrtPriceX96 = nativeIsZero
+            ? initialPrice.encodeSqrtPrice(priceRaw, 1e18)
+            : initialPrice.encodeSqrtPrice(1e18, priceRaw);
 
+        poolManager.initialize(_key, sqrtPriceX96);
+
+        // tokenFees default to 0 since we didnt charge fees in token0
         fairLaunch.closePosition({
             _poolKey: _key,
             _tokenFees: _poolFees[poolId].amount1,
             _nativeIsZero: nativeIsZero,
+            _sqrtPriceX96: sqrtPriceX96
         });
     }
 

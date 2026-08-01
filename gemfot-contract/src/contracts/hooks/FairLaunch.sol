@@ -179,22 +179,25 @@ contract FairLaunch is AccessControl {
         PoolKey memory _poolKey,
         uint _tokenFees,
         bool _nativeIsZero,
+        uint160 _sqrtPriceX96
     ) public onlyGemFotManager returns (FairLaunchInfo memory) {
         // Reference the pool's FairLaunchInfo, ready to store updated values
         FairLaunchInfo storage info = _fairLaunchInfo[_poolKey.toId()];
+
+        int24 initialTick = TickMath.getTickAtSqrtPrice(_sqrtPriceX96);
 
         int24 tickLower;
         int24 tickUpper;
 
         if (_nativeIsZero) {
             // USDC position
-            tickLower = (_initialTick + 1).validTick(false);
+            tickLower = (initialTick + 1).validTick(false);
             tickUpper = tickLower + TickFinder.TICK_SPACING;
             _createImmutablePosition(_poolKey, tickLower, tickUpper, info.revenue, true);
 
             // memecoin position (unsold fair launch supply gets burned in GemFotManager)
             tickLower = TickFinder.MIN_TICK;
-            tickUpper = (_initialTick - 1).validTick(true);
+            tickUpper = (initialTick - 1).validTick(true);
             _createImmutablePosition(
                 _poolKey,
                 tickLower,
@@ -204,12 +207,12 @@ contract FairLaunch is AccessControl {
             );
         } else {
             // USDC position
-            tickUpper = (_initialTick - 1).validTick(true);
+            tickUpper = (initialTick - 1).validTick(true);
             tickLower = tickUpper - TickFinder.TICK_SPACING;
             _createImmutablePosition(_poolKey, tickLower, tickUpper, info.revenue, false);
 
             // memecoin position (unsold fair launch supply gets burned in GemFotManager)
-            tickLower = (_initialTick + 1).validTick(false);
+            tickLower = (initialTick + 1).validTick(false);
             tickUpper = TickFinder.MAX_TICK;
             _createImmutablePosition(
                 _poolKey,
