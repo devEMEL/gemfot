@@ -5,7 +5,6 @@ import {ILaunch} from "@gemfot-interfaces/ILaunch.sol";
 import {IMemecoin} from "@gemfot-interfaces/IMemecoin.sol";
 import {GemFotManager} from "@gemfot/GemFotManager.sol";
 import {TokenSupply} from "@gemfot/libraries/TokenSupply.sol";
-import {MarketCappedPriceParams} from "@gemfot/types/USDCMarketCappedPrice.sol";
 import {Ownable} from "@solady/auth/Ownable.sol";
 import {ERC721} from "@solady/tokens/ERC721.sol";
 import {Initializable} from "@solady/utils/Initializable.sol";
@@ -42,7 +41,7 @@ contract Launch is ERC721, ILaunch, Initializable, Ownable {
     }
 
     /// The maximum value of a creator's fee allocation
-    uint public constant MAX_CREATOR_ALLOCATION = 100_00;
+    uint public constant MAX_CREATOR_ALLOCATION = 70_00;
 
     /// The maximum duration of a launch schedule
     uint public constant MAX_SCHEDULE_DURATION = 30 days;
@@ -73,7 +72,6 @@ contract Launch is ERC721, ILaunch, Initializable, Ownable {
 
     constructor() {
         _initializeOwner(msg.sender);
-        _disableInitializers();
     }
 
     /**
@@ -109,7 +107,6 @@ contract Launch is ERC721, ILaunch, Initializable, Ownable {
         onlyGemFotManager
         returns (address memecoin_, address payable memecoinTreasury_, uint tokenId_)
     {
-        (MarketCappedPriceParams memory params) = abi.decode(_params.initialPriceParams, (MarketCappedPriceParams));
 
         // Check if the launch timestamp surpasses the max schedule duration
         if (_params.launchAt > block.timestamp + MAX_SCHEDULE_DURATION) {
@@ -117,7 +114,7 @@ contract Launch is ERC721, ILaunch, Initializable, Ownable {
         }
 
         // Ensure that the initial supply falls within an accepted range
-        if (_params.initialTokenFairLaunch > params.totalSupply) {
+        if (_params.initialTokenFairLaunch > _params.totalSupply) {
             revert InvalidInitialSupply(_params.initialTokenFairLaunch);
         }
 
@@ -148,7 +145,7 @@ contract Launch is ERC721, ILaunch, Initializable, Ownable {
 
         // Initialize the memecoin with the metadata
         IMemecoin _memecoin = IMemecoin(memecoin_);
-        _memecoin.initialize(_params.name, _params.symbol, _params.tokenUri, params.totalSupply);
+        _memecoin.initialize(_params.name, _params.symbol, _params.tokenUri, _params.totalSupply);
 
         // Deploy the memecoin treasury
         memecoinTreasury_ = payable(LibClone.cloneDeterministic(memecoinTreasuryImplementation, bytes32(tokenId_)));
@@ -157,7 +154,7 @@ contract Launch is ERC721, ILaunch, Initializable, Ownable {
         tokenInfo[tokenId_] = TokenInfo(memecoin_, memecoinTreasury_);
 
         // Mint our initial supply to the {GemFotManager}
-        _memecoin.mint(address(gemfotManager), params.totalSupply);
+        _memecoin.mint(address(gemfotManager), _params.totalSupply);
     }
 
     /**

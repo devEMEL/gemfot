@@ -73,7 +73,7 @@ contract FairLaunch is AccessControl {
         uint remainingSupply;
         bool closed;
         uint targetMarketCap;
-        uint targetRaise;
+        uint multiple;
         uint p0;
     }
 
@@ -137,7 +137,7 @@ contract FairLaunch is AccessControl {
         uint _initialTokenFairLaunch,
         uint _fairLaunchDuration,
         uint _targetMarketCap,
-        uint _targetRaise,
+        uint _multiple,
         uint _p0
     ) public virtual onlyGemFotManager returns (FairLaunchInfo memory) {
         // If we have no initial tokens, then we need to overwrite our fair launch duration to zero
@@ -158,7 +158,7 @@ contract FairLaunch is AccessControl {
             remainingSupply: _initialTokenFairLaunch,
             closed: false,
             targetMarketCap: _targetMarketCap,
-            targetRaise: _targetRaise,
+            multiple: _multiple,
             p0: _p0
         });
 
@@ -252,7 +252,7 @@ contract FairLaunch is AccessControl {
      * @dev `zeroForOne` will always be equal to `_nativeIsZero` as it will always be ETH -> Token.
      *
      * @param poolId The PoolId we are filling from
-     * @param _amountSpecified The amount specified in the swap
+     * @param _amountSpecified The amount of native token specified in the swap
      *
      * @return nativeIn The amount of native token user pays 
      * @return tokensOut The amount of tokens user wants to buy 
@@ -268,49 +268,46 @@ contract FairLaunch is AccessControl {
     {
         FairLaunchInfo storage info = _fairLaunchInfo[poolId];
 
-        // No tokens, no fun.
+        // No deposit, no fun.
         if (_amountSpecified == 0) {
             return (0, 0, info);
         }
 
         uint sold = info.initialSupply - info.remainingSupply;
 
-        // If we have a negative amount specified, then we have an ETH amount passed in.
-        // Bonding curve exact input requires inverse calculation which is complex; assuming exact output.
+        // Bonding curve exact output requires the forward cost formula, which we no
+        // longer expose; users deposit native currency and receive memecoin instead.
         if (_amountSpecified < 0) {
-            revert("Exact input not supported for bonding curve");
+            revert("Exact output not supported for bonding curve");
         }
-        // Otherwise, if we have a positive amount specified, then we know the number of tokens that
-        // are being purchased and need to calculate the amount of ETH required.
+        // Otherwise, if we have a positive amount specified, then we know the amount
+        // of native currency being deposited and need to calculate the tokens received.
         else {
-            tokensOut = uint(_amountSpecified);
-            
-            if (tokensOut > info.remainingSupply) {
-                tokensOut = info.remainingSupply;
+            nativeIn = uint(_amountSpecified);
+
+            // If the curve is already exhausted, there's nothing left to buy.
+            if (info.remainingSupply == 0) {
+                return (0, 0, info);
             }
-            
-            nativeIn = LinearBondingCurve.calculateBuyCost(
+
+            tokensOut = LinearBondingCurve.calculateBuyAmount(
                 info.targetMarketCap,
                 info.initialSupply,
                 info.p0,
                 sold,
-                tokensOut
+                nativeIn
             );
-
         }
 
-        // If the user has requested more tokens than are available in the fair launch, then we
-        // need to strip back the amount that we can fulfill.
+        // If the computed tokens exceed what's left in the fair launch, cap the tokens
+        // and scale back nativeIn proportionally. There may be some slight accuracy loss,
+        // but it's all good.
         if (tokensOut > info.remainingSupply) {
-            // Calculate the percentage of tokensOut relative to the threshold and reduce the `nativeIn`
-            // value by the same amount. There may be some slight accuracy loss, but it's all good.
             uint percentage = info.remainingSupply * 1e18 / tokensOut;
             nativeIn = (nativeIn * percentage) / 1e18;
 
-            // Update our `tokensOut` to the remainingSupply limit
             tokensOut = info.remainingSupply;
         }
-
 
         info.revenue += nativeIn;
         info.remainingSupply -= tokensOut;
@@ -318,6 +315,8 @@ contract FairLaunch is AccessControl {
 
         return (nativeIn, tokensOut, info);
     }
+
+
 
     /**
      * Allows calls from the {GemFotManager} to modify the amount of revenue stored against a pool's

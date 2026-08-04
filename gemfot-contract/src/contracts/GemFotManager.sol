@@ -15,7 +15,6 @@ import {TreasuryActionManager} from "@gemfot/treasury/ActionManager.sol";
 import {MemecoinTreasury} from "@gemfot/treasury/MemecoinTreasury.sol";
 import {MemecoinFinder} from "@gemfot/types/MemecoinFinder.sol";
 import {StoreKeys} from "@gemfot/types/StoreKeys.sol";
-import {MarketCappedPriceParams} from "@gemfot/types/USDCMarketCappedPrice.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeTransferLib} from "@solady/utils/SafeTransferLib.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
@@ -159,7 +158,9 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
      * @custom:member creator The address that will receive the ERC721 ownership and premined ERC20 tokens
      * @custom:member creatorFeeAllocation The percentage of fees the creators wants to take from the BidWall
      * @custom:member launchAt The timestamp at which the token will launch
-     * @custom:member initialPriceParams The encoded parameters for the Initial Price logic
+     * @custom:member totalSupply Total supply of tokens
+     * @custom:member usdcMarketCap The target market cap of the token
+     * @custom:member multiple Multiple of the usdcMarketCap that will be raised (e.g x7 - say first buyer pays $1 and second buyer pays $7)
      */
     struct LaunchParams {
         string name;
@@ -171,7 +172,10 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
         address creator;
         uint24 creatorFeeAllocation;
         uint launchAt;
-        bytes initialPriceParams; //(totalSupply, usdcMarketCap, targetRaise)
+
+        uint totalSupply;
+        uint usdcMarketCap;
+        uint8 multiple;
     }
 
     /// The minimum amount before a distribution is triggered
@@ -260,7 +264,6 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
     function launch(
         LaunchParams calldata _params
     ) external payable returns (address memecoin_) {
-        (MarketCappedPriceParams memory params) = abi.decode(_params.initialPriceParams, (MarketCappedPriceParams));
 
         uint tokenId;
         address payable memecoinTreasury;
@@ -290,7 +293,7 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
         _poolKeys[memecoin_] = _poolKey;
         PoolId poolId = _poolKey.toId();
 
-        uint p0 = LinearBondingCurve.computeP0(params.usdcMarketCap, params.targetRaise, _params.initialTokenFairLaunch);
+        uint p0 = LinearBondingCurve.computeP0(_params.usdcMarketCap, _params.initialTokenFairLaunch, _params.multiple);
 
         // If we have a non-zero creator fee allocation, then we need to update our creator's
         // fee allocation.
@@ -299,7 +302,7 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
         }
 
         // Check if we have an initial launching fee, check that enough ETH has been sent
-        uint launchFee = getLaunchingFee(_params.initialPriceParams);
+        uint launchFee = getLaunchingFee();
 
         emit PoolCreated({
             _poolId: poolId,
@@ -339,8 +342,8 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
             _launchesAt: _params.launchAt > block.timestamp ? _params.launchAt : block.timestamp,
             _initialTokenFairLaunch: _params.initialTokenFairLaunch,
             _fairLaunchDuration: _params.fairLaunchDuration,
-            _targetMarketCap: params.usdcMarketCap,
-            _targetRaise: params.targetRaise,
+            _targetMarketCap: _params.usdcMarketCap,
+            _multiple: _params.multiple,
             _p0: p0
         });
 
@@ -396,10 +399,8 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
      *
      * @return The USDC value of the fee
      */
-    function getLaunchingFee(
-        bytes calldata _initialPriceParams
-    ) public view returns (uint) {
-        return initialPrice.getLaunchingFee(msg.sender, _initialPriceParams);
+    function getLaunchingFee() public view returns (uint) {
+        return initialPrice.getLaunchingFee();
     }
 
 

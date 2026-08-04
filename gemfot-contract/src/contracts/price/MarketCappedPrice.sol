@@ -7,10 +7,8 @@ import {FullMath} from "@uniswap/v4-core/src/libraries/FullMath.sol";
 import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
 
-import {LaunchFeeExemption} from "../price/LaunchFeeExemption.sol"; 
 import {TokenSupply} from "../libraries/TokenSupply.sol"; 
 
-import {MarketCappedPriceParams} from "@gemfot/types/USDCMarketCappedPrice.sol";
 import {LinearBondingCurve} from "../libraries/LinearBondingCurve.sol";
 
 /**
@@ -28,61 +26,31 @@ contract USDCMarketCappedPrice is Ownable {
     error MarketCapTooSmall(uint _usdcMarketCap, uint _usdcMarketCapMinimum);
     error TotalSupplyOutOfRange(uint _totalSupply, uint _totalSupplyMinimum, uint _totalSupplyMaximum);
 
-    event LaunchFeeThresholdUpdated(uint _launchFeeThreshold);
+    event LaunchFeeUpdated (uint256 _launchFee);
 
     /// Sets a minimum market cap threshold ($1,000, scaled to USDC's 6 decimals)
     uint public constant MINIMUM_USDC_MARKET_CAP = 1000 * 1e6;
 
-    /// The minimum launch price that would incur a launching fee
-    uint public launchFeeThreshold;
+    uint public launchFee = 10 * 1e6; // 10 USDC
 
-    /// The {LaunchFeeExemption} contract
-    LaunchFeeExemption public immutable launchFeeExemption;
+
 
     /**
      * @param _protocolOwner The address of the owner
-     * @param _launchFeeExemption The {LaunchFeeExemption} contract address
      */
     constructor(
-        address _protocolOwner,
-        address _launchFeeExemption
+        address _protocolOwner
     ) {
-        launchFeeExemption = LaunchFeeExemption(_launchFeeExemption);
         _initializeOwner(_protocolOwner);
     }
 
     /**
-     * @notice Gets the Launching fee, which is 0.1% (1/1000) of the desired market cap.
+     * @notice Gets the Launching fee.
      * Paid in USDC since USDC is the native token of the launchpool.
-     *
-     * @param _sender The address launching, which may be excluded from launching fees
-     * @param _initialPriceParams Parameters containing the target market cap
-     *
      * @return The fee taken from the user for Launching a token
      */
-    function getLaunchingFee(
-        address _sender,
-        bytes calldata _initialPriceParams
-    ) public view returns (uint) {
-        (MarketCappedPriceParams memory params) = abi.decode(_initialPriceParams, (MarketCappedPriceParams));
-
-        // Ensure that our requested total supply is within the allowed range
-        if (params.totalSupply < TokenSupply.MIN_TOTAL_SUPPLY || params.totalSupply > TokenSupply.MAX_TOTAL_SUPPLY) {
-            revert TotalSupplyOutOfRange(params.totalSupply, TokenSupply.MIN_TOTAL_SUPPLY, TokenSupply.MAX_TOTAL_SUPPLY);
-        }
-
-        // If the fee is below our set threshold, then we want to exclude the fee
-        // if (params.usdcMarketCap <= launchFeeThreshold) {
-        //     return 0;
-        // }
-
-        // Check if our `_sender` is fee excluded
-        if (launchFeeExemption.feeExcluded(_sender)) {
-            return 0;
-        }
-
-        // 0.1% of the market cap in USDC units
-        return params.usdcMarketCap / 10000; // instead of 1000, just for testnet purposes.
+    function getLaunchingFee() public view returns (uint) {
+        return launchFee; 
     }
 
 
@@ -164,16 +132,18 @@ contract USDCMarketCappedPrice is Ownable {
 
 
     /**
-     * Allows the `launchFeeThreshold` to be updated.
+     * Allows the `launchFee` to be updated.
      *
-     * @param _launchFeeThreshold The new launch fee threshold
+     * @param _launchFee The new fee for launching a token
      */
-    function setLaunchFeeThreshold(
-        uint _launchFeeThreshold
+    function setLaunchFee(
+        uint256 _launchFee
     ) public onlyOwner {
-        launchFeeThreshold = _launchFeeThreshold;
-        emit LaunchFeeThresholdUpdated(_launchFeeThreshold);
+        launchFee = _launchFee;
+        emit LaunchFeeUpdated(_launchFee);
     }
+
+
 
     function _guardInitializeOwner() internal pure virtual override returns (bool) {
         return true;

@@ -1,15 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {LaunchFeeExemption} from "@gemfot/price/LaunchFeeExemption.sol";
 
 interface IInitialPrice {
-    function launchFeeExemption() external returns (LaunchFeeExemption);
 
-    function getLaunchingFee(
-        address _sender,
-        bytes calldata _initialPriceParams
-    ) external view returns (uint);
+    function getLaunchingFee() external view returns (uint);
 
     function getPricing(
         uint _targetMarketCap,
