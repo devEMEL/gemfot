@@ -1,0 +1,67 @@
+specVersion: 1.0.0
+description: GemFot — fair-launch memecoins on Arc
+repository: https://github.com/devEMEL/gemfot
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum/contract
+    name: GemFotManager
+    network: arc-testnet
+    source:
+      address: "0xCa510bB4ae1e45Dcd4141b82b152C239282cAFDc"
+      abi: GemFotManager
+      startBlock: 55488155
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: ./src/mappings/gemfotManager.ts
+      entities:
+        - Protocol
+        - Creator
+        - Launch
+        - Swap
+      abis:
+        - name: GemFotManager
+          file: ./abis/GemFotManager.json
+        - name: Launch
+          file: ./abis/Launch.json
+        - name: Memecoin
+          file: ./abis/Memecoin.json
+      eventHandlers:
+        - event: PoolCreated(indexed bytes32,address,address,uint256,bool,uint256,(string,string,string,uint256,uint256,uint256,address,uint24,uint256,uint256,uint256,uint8))
+          handler: handlePoolCreated
+        - event: PoolScheduled(indexed bytes32,uint256)
+          handler: handlePoolScheduled
+        - event: PoolPremine(indexed bytes32,int256)
+          handler: handlePoolPremine
+        - event: PremineBurned(indexed bytes32,uint256)
+          handler: handlePremineBurned
+        - event: PoolSwap(indexed bytes32,int256,int256,int256,int256,int256,int256,int256,int256,int256,int256,int256,int256)
+          handler: handlePoolSwap
+
+  - kind: ethereum/contract
+    name: FairLaunch
+    network: arc-testnet
+    source:
+      address: "0xDE612935787716E271a4b9f6f05a6B22b976ee11"
+      abi: FairLaunch
+      startBlock: 55488155
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: ./src/mappings/fairLaunch.ts
+      entities:
+        - Launch
+        - FairLaunchBuy
+      abis:
+        - name: FairLaunch
+          file: ./abis/FairLaunch.json
+      eventHandlers:
+        - event: FairLaunchCreated(indexed bytes32,uint256,uint256,uint256)
+          handler: handleFairLaunchCreated
+        - event: FairLaunchBought(indexed bytes32,uint256,uint256,uint256)
+          handler: handleFairLaunchBought
+        - event: FairLaunchEnded(indexed bytes32,uint256,uint256,uint256,uint256)
+          handler: handleFairLaunchEnded

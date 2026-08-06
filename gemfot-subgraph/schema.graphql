@@ -1,0 +1,110 @@
+type Protocol @entity(immutable: false) {
+  "Singleton id = 'gemfot'"
+  id: ID!
+  launchCount: BigInt!
+  totalRevenue: BigInt!
+  totalBuys: BigInt!
+}
+
+type Creator @entity(immutable: false) {
+  "creator address"
+  id: ID!
+  launchCount: BigInt!
+  totalRevenue: BigInt!
+  launches: [Launch!]! @derivedFrom(field: "creator")
+}
+
+type Launch @entity(immutable: false) {
+  "poolId (bytes32 hex)"
+  id: ID!
+  poolId: Bytes!
+  memecoin: Bytes!
+  memecoinTreasury: Bytes!
+  tokenId: BigInt!
+  currencyFlipped: Boolean!
+
+  name: String!
+  symbol: String!
+  tokenUri: String!
+
+  creator: Creator!
+  creatorFeeAllocation: BigInt!
+
+  initialTokenFairLaunch: BigInt!
+  fairLaunchDuration: BigInt!
+  fairLaunchStartsAt: BigInt!
+  fairLaunchEndsAt: BigInt!
+  fairLaunchClosed: Boolean!
+
+  targetMarketCap: BigInt!
+  multiple: BigInt!
+  initialPriceIndex: BigInt!
+
+  premineAmount: BigInt!
+  premineBurned: Boolean!
+
+  "USDC raised through the fair launch"
+  revenue: BigInt!
+  "Tokens left in the fair launch position"
+  remainingSupply: BigInt!
+  "Tokens sold through the fair launch"
+  soldSupply: BigInt!
+  buyCount: BigInt!
+
+  "Timestamp the pool opens for trading (0 = immediately)"
+  flaunchesAt: BigInt!
+  scheduledAt: BigInt
+
+  createdAtTimestamp: BigInt!
+  createdAtBlock: BigInt!
+  transactionHash: Bytes!
+
+  buys: [FairLaunchBuy!]! @derivedFrom(field: "launch")
+  swaps: [Swap!]! @derivedFrom(field: "launch")
+}
+
+type FairLaunchBuy @entity(immutable: true) {
+  "txHash-logIndex"
+  id: ID!
+  launch: Launch!
+  buyer: Bytes!
+  nativeIn: BigInt!
+  tokensOut: BigInt!
+  totalSold: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+type Swap @entity(immutable: true) {
+  "txHash-logIndex"
+  id: ID!
+  launch: Launch!
+  sender: Bytes!
+  flAmount0: BigInt!
+  flAmount1: BigInt!
+  flFee0: BigInt!
+  flFee1: BigInt!
+  ispAmount0: BigInt!
+  ispAmount1: BigInt!
+  ispFee0: BigInt!
+  ispFee1: BigInt!
+  uniAmount0: BigInt!
+  uniAmount1: BigInt!
+  uniFee0: BigInt!
+  uniFee1: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+}
+
+type FeeDistribution @entity(immutable: true) {
+  "txHash-logIndex"
+  id: ID!
+  launch: Launch!
+  recipient: Bytes!
+  amount: BigInt!
+  isCreator: Boolean!
+  timestamp: BigInt!
+  transactionHash: Bytes!
+}

@@ -1,0 +1,532 @@
+@import "tailwindcss";
+
+@theme {
+  /* --- GemFot green palette --- */
+  --color-gem-50: #f2fbe9;
+  --color-gem-100: #e2f6cd;
+  --color-gem-200: #c6ed9e;
+  --color-gem-300: #a5e068;
+  --color-gem-400: #8fcb3b;
+  --color-gem-500: #6fb62a;
+  --color-gem-600: #4f9a25;
+  --color-gem-700: #3baa35;
+  --color-gem-800: #2c6b1f;
+  --color-gem-900: #1e4a17;
+
+  --color-primary: #6fb62a;
+  --color-primary-bright: #8fcb3b;
+  --color-accent: #ffd84d;
+  --color-danger: #ff6b57;
+
+  /* Surfaces — dark system. "ink" is now the *foreground*, "cream" the page. */
+  --color-cream: #000000;
+  --color-cream-deep: #070906;
+  --color-paper: #0b0d0a;
+  --color-ink: #f4f7f1;
+  --color-ink-soft: #d3dacb;
+  --color-ink-mute: #9daa93;
+  --color-rule: rgba(143, 203, 59, 0.22);
+  --color-rule-soft: rgba(244, 247, 241, 0.1);
+
+  /* Green gradient boxes */
+  --gradient-box: linear-gradient(
+    145deg,
+    rgba(143, 203, 59, 0.14) 0%,
+    rgba(59, 170, 53, 0.06) 52%,
+    rgba(0, 0, 0, 0.92) 100%
+  );
+  --gradient-box-strong: linear-gradient(135deg, #8fcb3b 0%, #3baa35 100%);
+
+  --font-ubuntu: "Ubuntu", ui-sans-serif, sans-serif;
+  --font-figtree: "Figtree", ui-sans-serif, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  /* Everything is square in this system. */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
+  --radius-DEFAULT: 0px;
+}
+
+html,
+body,
+#root {
+  background-color: #000000;
+  color: var(--color-ink);
+  font-family: var(--font-ubuntu);
+  font-size: 16px;
+  /* Heavier baseline — no more faint text. */
+  font-weight: 500;
+  font-variant-numeric: lining-nums tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  /* Faint engineering grid — now glowing green on black. */
+  background-color: #000000;
+  background-image: linear-gradient(rgba(143, 203, 59, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(143, 203, 59, 0.05) 1px, transparent 1px);
+  background-size: 56px 56px;
+  background-position: -1px -1px;
+  background-attachment: fixed;
+}
+
+* {
+  border-color: var(--color-rule-soft);
+}
+
+::selection {
+  background: #8fcb3b;
+  color: #050704;
+}
+
+/* Nothing should render thinner than medium. */
+p,
+span,
+li,
+a,
+label,
+td,
+th,
+div,
+button,
+input,
+select,
+textarea {
+  font-weight: inherit;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.font-light,
+.font-thin,
+.font-extralight {
+  font-weight: 500 !important;
+}
+
+.font-normal {
+  font-weight: 500;
+}
+
+@layer utilities {
+  /* --------------------------------------------------- typography ---- */
+  .mono {
+    font-family: var(--font-mono);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "zero" 1;
+  }
+  .num {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--color-ink-mute);
+  }
+  .display {
+    letter-spacing: -0.035em;
+    font-weight: 800;
+    line-height: 0.95;
+  }
+
+  /* Muted text helpers — readable on black */
+  .text-muted {
+    color: var(--color-ink-mute);
+    font-weight: 500;
+  }
+
+  /* ------------------------------------------------------- buttons ---- */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.14s ease, color 0.14s ease, border-color 0.14s ease,
+      box-shadow 0.14s ease, transform 0.1s ease;
+  }
+  .btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .btn-primary,
+  .btn-ink {
+    background: var(--gradient-box-strong);
+    color: #050704;
+    border: 1px solid #8fcb3b;
+  }
+  .btn-primary:hover:not(:disabled),
+  .btn-ink:hover:not(:disabled) {
+    filter: brightness(1.1);
+  }
+  .btn-primary:active:not(:disabled),
+  .btn-ink:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  .btn-accent {
+    background: var(--gradient-box-strong);
+    color: #050704;
+    border: 1px solid #a5e068;
+  }
+  .btn-accent:hover:not(:disabled) {
+    filter: brightness(1.12);
+  }
+
+  .btn-soft {
+    background: linear-gradient(145deg, rgba(143, 203, 59, 0.12), rgba(0, 0, 0, 0.6));
+    color: var(--color-ink);
+    border: 1px solid var(--color-rule);
+  }
+  .btn-soft:hover:not(:disabled) {
+    border-color: #8fcb3b;
+    color: #c6ed9e;
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--color-ink-soft);
+    border: 1px solid transparent;
+  }
+  .btn-ghost:hover:not(:disabled) {
+    color: #c6ed9e;
+    border-color: var(--color-rule);
+  }
+
+  .btn-danger {
+    background: transparent;
+    color: var(--color-danger);
+    border: 1px solid rgba(255, 107, 87, 0.4);
+  }
+  .btn-danger:hover:not(:disabled) {
+    background: rgba(255, 107, 87, 0.12);
+    border-color: var(--color-danger);
+  }
+
+  /* ------------------------------------------------------ surfaces ---- */
+  .card {
+    background: var(--gradient-box);
+    background-color: #0b0d0a;
+    border: 1px solid var(--color-rule);
+    border-radius: 0;
+    color: var(--color-ink);
+  }
+  .card-hover {
+    transition: border-color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
+  }
+  .card-hover:hover {
+    border-color: #8fcb3b;
+    box-shadow: 4px 4px 0 0 rgba(143, 203, 59, 0.45);
+    transform: translate(-2px, -2px);
+  }
+
+  /* A tile in a data grid: shares borders with its neighbours */
+  .tile {
+    background: var(--gradient-box);
+    background-color: #0b0d0a;
+    border: 1px solid var(--color-rule);
+    border-radius: 0;
+  }
+
+  .slab {
+    background: var(--gradient-box-strong);
+    color: #050704;
+    border: 1px solid #8fcb3b;
+  }
+
+  .hatch {
+    background-image: repeating-linear-gradient(
+      45deg,
+      rgba(143, 203, 59, 0.08) 0px,
+      rgba(143, 203, 59, 0.08) 1px,
+      transparent 1px,
+      transparent 7px
+    );
+  }
+
+  .rule-t {
+    border-top: 1px solid var(--color-rule);
+  }
+  .rule-b {
+    border-bottom: 1px solid var(--color-rule);
+  }
+  .rule-l {
+    border-left: 1px solid var(--color-rule);
+  }
+  .rule-r {
+    border-right: 1px solid var(--color-rule);
+  }
+
+  .text-gradient {
+    background: var(--gradient-box-strong);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    font-weight: 800;
+  }
+
+  /* --------------------------------------------------------- chips ---- */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 0;
+    padding: 0.2rem 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.4;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-weight: 600;
+    border: 1px solid var(--color-rule);
+    background: linear-gradient(145deg, rgba(143, 203, 59, 0.1), rgba(0, 0, 0, 0.5));
+    color: var(--color-ink-soft);
+  }
+  .chip-live {
+    background: linear-gradient(135deg, rgba(143, 203, 59, 0.3), rgba(59, 170, 53, 0.14));
+    border-color: #8fcb3b;
+    color: #dcf5b6;
+  }
+  .chip-ink {
+    background: var(--gradient-box-strong);
+    border-color: #8fcb3b;
+    color: #050704;
+  }
+
+  /* -------------------------------------------------------- inputs ---- */
+  .input-field {
+    background: #0b0d0a;
+    border: 1px solid var(--color-rule);
+    color: var(--color-ink);
+    font-weight: 500;
+    border-radius: 0;
+    transition: border-color 0.14s ease, box-shadow 0.14s ease;
+  }
+  .input-field::placeholder {
+    color: rgba(244, 247, 241, 0.42);
+    font-weight: 500;
+  }
+
+  .input-field:focus {
+    outline: none;
+    border-color: #8fcb3b;
+    box-shadow: 2px 2px 0 0 rgba(143, 203, 59, 0.5);
+  }
+
+  select.input-field {
+    appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, #8fcb3b 50%),
+      linear-gradient(135deg, #8fcb3b 50%, transparent 50%);
+    background-position: calc(100% - 16px) 52%, calc(100% - 11px) 52%;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 2rem;
+  }
+  select.input-field option {
+    background: #0b0d0a;
+    color: var(--color-ink);
+  }
+
+  /* --------------------------------------------------------- misc ---- */
+  .seg {
+    display: inline-flex;
+    border: 1px solid var(--color-rule);
+    background: #0b0d0a;
+  }
+  .seg > button {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0 0.85rem;
+    color: var(--color-ink-mute);
+    cursor: pointer;
+    transition: background-color 0.12s ease, color 0.12s ease;
+  }
+  .seg > button + button {
+    border-left: 1px solid var(--color-rule);
+  }
+  .seg > button:hover {
+    color: #c6ed9e;
+  }
+  .seg > button[data-active="true"] {
+    background: var(--gradient-box-strong);
+    color: #050704;
+  }
+
+  .meter {
+    height: 6px;
+    background: rgba(244, 247, 241, 0.08);
+    border: 1px solid var(--color-rule);
+    overflow: hidden;
+  }
+  .meter > span {
+    display: block;
+    height: 100%;
+    background: var(--gradient-box-strong);
+  }
+  .meter-live > span {
+    background: var(--gradient-box-strong);
+  }
+
+  .link-underline {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+    text-decoration-color: rgba(143, 203, 59, 0.45);
+  }
+  .link-underline:hover {
+    text-decoration-color: #8fcb3b;
+  }
+
+  .scrollbar-thin-green::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-thin-green::-webkit-scrollbar-thumb {
+    background: rgba(143, 203, 59, 0.4);
+  }
+
+  @keyframes blink {
+    0%,
+    49% {
+      opacity: 1;
+    }
+    50%,
+    100% {
+      opacity: 0.15;
+    }
+  }
+  .animate-blink {
+    animation: blink 1.2s steps(1) infinite;
+  }
+
+  @keyframes gem-float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-6px);
+    }
+  }
+  .animate-gem-float {
+    animation: gem-float 5s ease-in-out infinite;
+  }
+
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  .animate-marquee {
+    animation: marquee 38s linear infinite;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Legacy light-theme literals used across the components, remapped   */
+/* onto the black + green-gradient system. These pages were authored   */
+/* for a cream page, so `bg-white` panels become gradient boxes and    */
+/* `bg-ink` slabs (which were the dark accent) become green.           */
+/* ------------------------------------------------------------------ */
+
+/* White panels -> green gradient boxes */
+[class~="bg-white"] {
+  background-color: #0b0d0a !important;
+  background-image: var(--gradient-box) !important;
+}
+[class~="hover\:bg-white"]:hover {
+  background-color: #10140d !important;
+}
+
+/* Page-level cream washes -> pure black */
+[class*="bg-cream"] {
+  background-color: rgba(0, 0, 0, 0.92) !important;
+  background-image: none !important;
+}
+
+/* The old dark accent slab -> green gradient */
+[class~="bg-ink"] {
+  background-image: var(--gradient-box-strong) !important;
+  color: #050704 !important;
+}
+
+/* Very low-alpha ink washes were near-invisible section tints on cream;
+   on black they must lighten, not darken. */
+[class="bg-ink\/\[0\.02\]"],
+[class~="bg-ink\/\[0\.02\]"],
+[class~="bg-ink\/\[0\.04\]"] {
+  background-color: rgba(143, 203, 59, 0.05) !important;
+}
+
+/* Hairline grid gaps */
+[class~="bg-ink\/12"] {
+  background-color: rgba(143, 203, 59, 0.2) !important;
+}
+[class~="hover\:bg-ink\/\[0\.04\]"]:hover {
+  background-color: rgba(143, 203, 59, 0.1) !important;
+}
+
+/* Borders */
+[class*="border-ink"] {
+  border-color: var(--color-rule) !important;
+}
+[class~="hover\:border-ink"]:hover {
+  border-color: #8fcb3b !important;
+}
+
+/* Text colours */
+[class~="text-ink"] {
+  color: var(--color-ink) !important;
+}
+[class~="text-ink-soft"] {
+  color: var(--color-ink-soft) !important;
+}
+[class~="text-ink-mute"] {
+  color: var(--color-ink-mute) !important;
+}
+[class*="text-ink/"],
+[class*="text-black/"] {
+  color: var(--color-ink-soft) !important;
+}
+[class~="text-gem-50"] {
+  color: #050704 !important;
+}
+
+/* Hard-coded ink drop shadows -> green */
+[class*="shadow-[4px_4px_0_0_#0d0f0c]"]:hover,
+[class*="shadow-[4px_4px_0_0_#0d0f0c]"] {
+  --tw-shadow-color: rgba(143, 203, 59, 0.45);
+  box-shadow: 4px 4px 0 0 rgba(143, 203, 59, 0.45) !important;
+}

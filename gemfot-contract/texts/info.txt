@@ -1,0 +1,43 @@
+
+-- check all setters like setSwapFeeThreshold etc and store them for reference.
+
+-- owner should call setP0 on fairLaunch.sol (how to set the range/curve though)
+-- (no need since its enabled by default) token creator calls setDisabledState with false to enable bidwall. (so memecoin treasury gets no fee)
+-- TOKEN CREATOR CAN DECIDE WHAT TO DO WITH TOKENS IN THE MEMECOIN TREASURY LATER
+-- (change in BidWall.sol) _swapFeeThreshold = 0.1 ether; // change from 0.1 to 200 usdc
+-- setSwapFeeThreshold (owner can also update it)
+
+-- owner calls setNotifierLaunch on Indexer.sol
+-- deploy ActionManager.sol and approve all treasury actions (deploy all) with approveAction(address action)
+-- token creator can call executeAction on MemecoinTreasury(action, data)..check the action contract to see how to encode data.
+
+-- in the frontend, once connected wallet is token creator (show memecoin treasury balance and they should see actions like burntokens, buyback ...memecoin treasury funds btw..)
+
+-- explain fee distribution well in presentation/slides/whatever (the % structure and which goes to the other if not enabled/valid)
+-- check how to enable bidwall (its used for buyback right?)
+
+
+-- // In your deployment script / setup function:
+contractInstance.grantRole(ProtocolRoles.GEMFOT_MANAGER, gemFotManagerAddress);
+call on both bidwall and fairLaunch (deploy bidwall and fairlaunch too)
+
+-- deploy protocolFeeRecipient
+-- everybody should WITHDRAW fees directly from feeEscrow.sol and protocolowner should withdraw via protocolFeeRecipient
+-- deploy Notifier.sol
+-- Call notifier.subscribe for all deployed contracts in subscribers
+-- setFeeDistribution() -- swap fee and protocolfee
+-- deploy contracts in gemfotmanager constructor
+-- deploy bidwall
+-- deploy feeEscrow and set _indexer (indexer.sol) in the constructor
+-- set _feeCalculator to address(0) (dont deploy it, just pass address(0))
+-- call setLaunch and setInitialPrice to set both launch and InitialPrice(MarketCappedPrice) ca
+-- call setFeeEscrow on protocolFeeRecipient.sol to set feeEscrow address
+
+--- WE CAN ALWAYS ADD MORE ACTIONS AND MANAGERS IN FUTURE.......................
+
+------ CAN DO ---------
+-- TOKEN CREATROR CAN closeBidWall() WHICH REMOVES LIQUIDITY AND SEND TOKENS TO MemecoinTreasury
+
+MAX_PROTOCOL_ALLOCATION = 10_00;
+creator chooses their allocation
+set others like 

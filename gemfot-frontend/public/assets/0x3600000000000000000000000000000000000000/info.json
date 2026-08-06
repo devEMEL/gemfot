@@ -1,0 +1,27 @@
+{
+    "name": "USDC",
+    "website": "",
+    "description": "",
+    "explorer": "",
+    "symbol": "USDC",
+    "type": "erc20",
+    "decimals": 6,
+    "links": [
+        {
+            "name": "github",
+            "url": ""
+        },
+        {
+            "name": "twitter",
+            "url": ""
+        },
+        {
+            "name": "reddit",
+            "url": ""
+        },
+        {
+            "name": "whitepaper",
+            "url": ""
+        }
+    ]
+}

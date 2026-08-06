@@ -1,0 +1,27 @@
+{
+    "name": "Honey",
+    "website": "",
+    "description": "",
+    "explorer": "",
+    "symbol": "HNY",
+    "type": "erc20",
+    "decimals": 18,
+    "links": [
+        {
+            "name": "github",
+            "url": ""
+        },
+        {
+            "name": "twitter",
+            "url": ""
+        },
+        {
+            "name": "reddit",
+            "url": ""
+        },
+        {
+            "name": "whitepaper",
+            "url": ""
+        }
+    ]
+}

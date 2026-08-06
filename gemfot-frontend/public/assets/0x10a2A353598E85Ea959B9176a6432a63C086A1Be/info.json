@@ -1,0 +1,27 @@
+{
+    "name": "Reach",
+    "website": "",
+    "description": "",
+    "explorer": "",
+    "symbol": "RCH",
+    "type": "erc20",
+    "decimals": 18,
+    "links": [
+        {
+            "name": "github",
+            "url": ""
+        },
+        {
+            "name": "twitter",
+            "url": ""
+        },
+        {
+            "name": "reddit",
+            "url": ""
+        },
+        {
+            "name": "whitepaper",
+            "url": ""
+        }
+    ]
+}

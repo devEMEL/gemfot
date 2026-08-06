@@ -1,0 +1,123 @@
+{
+  poolManagers(first: 1) {
+    id
+    poolCount
+    txCount
+    totalVolumeUSD
+    totalFeesUSD
+    totalValueLockedUSD
+    owner
+  }
+
+  uniswapDayDatas(first: 1, orderBy: date, orderDirection: desc) {
+     id
+    date
+    volumeUSD
+    feesUSD
+    txCount
+    tvlUSD
+  }
+
+
+
+  pools(
+    first: 20
+    orderBy: totalValueLockedUSD
+    orderDirection: desc
+  ) {
+    id
+    createdAtTimestamp
+
+    token0 {
+      id
+      symbol
+      name
+      decimals
+      derivedUSDC
+    }
+
+    token1 {
+      id
+      symbol
+      name
+      decimals
+      derivedUSDC
+    }
+
+    feeTier
+    liquidity
+    sqrtPrice
+    token0Price
+    token1Price
+    tick
+    tickSpacing
+
+    volumeUSD
+    feesUSD
+    txCount
+
+    totalValueLockedToken0
+    totalValueLockedToken1
+    totalValueLockedUSD
+
+    hooks
+  }
+
+  
+  tokens(
+    first: 100
+    orderBy: totalValueLockedUSD
+    orderDirection: desc
+  ) {
+    id
+    symbol
+    name
+    decimals
+    totalSupply
+
+    volumeUSD
+    feesUSD
+    txCount
+    poolCount
+
+    totalValueLocked
+    totalValueLockedUSD
+    derivedUSDC
+  }
+
+
+
+  swaps(
+    first: 20
+    orderBy: timestamp
+    orderDirection: desc
+  ) {
+    id
+    timestamp
+
+    pool {
+      id
+    }
+
+    token0 {
+      id
+      symbol
+    }
+
+    token1 {
+      id
+      symbol
+    }
+
+    sender
+    origin
+
+    amount0
+    amount1
+    amountUSD
+
+    sqrtPriceX96
+    tick
+  }
+
+}

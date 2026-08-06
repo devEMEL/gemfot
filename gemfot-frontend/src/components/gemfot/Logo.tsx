@@ -1,0 +1,65 @@
+import { Link } from 'react-router-dom';
+
+export function LogoMark({
+  size = 30,
+  className = '',
+}: {
+  size?: number;
+  className?: string;
+}) {
+  return (
+    <svg
+      /* Padded viewBox so the leading strokes of the mark are never clipped. */
+      viewBox="290 90 550 460"
+      width={size}
+      height={size}
+      preserveAspectRatio="xMidYMid meet"
+      className={`shrink-0 overflow-visible ${className}`}
+      role="img"
+      aria-label="GemFot"
+    >
+      <defs>
+        <linearGradient id="gemfotLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#8FCB3B" />
+          <stop offset="100%" stopColor="#3BAA35" />
+        </linearGradient>
+      </defs>
+      <g transform="translate(0,630) scale(0.1,-0.1)">
+        <path
+          fill="currentColor"
+          d="M6510 4622 c0 -5 -21 -33 -47 -63 -25 -30 -125 -148 -221 -264 -96 -115 -183 -218 -194 -227 -19 -17 -71 -18 -787 -18 -472 0 -790 -4 -829 -10 -181 -30 -427 -144 -574 -267 -189 -157 -342 -396 -405 -630 -24 -89 -27 -115 -27 -293 -1 -184 1 -201 27 -300 88 -325 310 -590 629 -751 90 -45 249 -104 346 -129 23 -6 42 -15 42 -19 0 -5 -34 -112 -76 -237 -41 -126 -77 -234 -79 -241 -3 -9 -30 -5 -97 13 -150 40 -216 63 -338 121 -210 99 -360 205 -530 373 -178 176 -306 371 -389 591 -74 197 -100 332 -108 554 -10 300 39 533 166 797 164 340 414 599 759 786 202 110 427 178 697 211 90 11 2035 14 2035 3z"
+        />
+        <path
+          fill="url(#gemfotLogoGrad)"
+          d="M7004 3374 c26 -10 19 -37 -24 -95 -21 -30 -67 -94 -100 -143 -34 -49 -80 -113 -103 -144 -23 -30 -47 -63 -53 -74 -6 -10 -22 -30 -35 -44 l-24 -26 -1055 7 c-580 5 -1123 9 -1207 9 -83 1 -154 4 -159 8 -10 11 57 148 73 148 7 0 28 24 46 53 19 28 51 70 71 92 20 22 52 67 71 101 49 85 66 98 139 105 81 8 2340 11 2360 3z m-519 -798 c11 -4 14 -12 10 -27 -6 -17 -213 -298 -327 -442 -17 -22 -22 -22 -391 -25 l-374 -3 -11 -22 c-16 -32 -62 -149 -62 -158 0 -4 -5 -20 -11 -36 -7 -15 -31 -84 -54 -153 -51 -149 -64 -185 -81 -225 -13 -30 -22 -57 -78 -220 l-31 -90 -60 -30 c-33 -16 -94 -46 -135 -64 -41 -19 -138 -66 -214 -103 -131 -64 -165 -76 -178 -62 -6 5 8 53 74 244 21 63 63 189 93 280 30 91 70 212 90 270 20 58 59 175 87 260 59 182 172 509 195 563 9 21 22 41 29 45 15 9 1407 7 1429 -2z"
+        />
+      </g>
+    </svg>
+  );
+}
+
+export function Logo({
+  compact = false,
+  size = 30,
+}: {
+  compact?: boolean;
+  size?: number;
+}) {
+  return (
+    <Link
+      to="/"
+      className="flex items-center gap-2.5 group shrink-0 pl-1 pr-2 py-1"
+      aria-label="GemFot home"
+    >
+      <LogoMark size={size} className="text-ink" />
+
+      {!compact && (
+        <span className="text-[18px] font-extrabold tracking-[-0.04em] leading-none lowercase text-ink">
+          gemfot
+        </span>
+      )}
+    </Link>
+  );
+}
+
+export default Logo;

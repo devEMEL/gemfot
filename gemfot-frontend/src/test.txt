@@ -1,0 +1,2850 @@
+import { HardhatEthersProvider } from "@nomicfoundation/hardhat-ethers/internal/hardhat-ethers-provider";
+import { ContractTransactionReceipt, ethers } from "ethers";
+import _deployments_ from "../deploy/deployments";
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { HardhatEthersHelpers, HardhatRuntimeEnvironment } from "hardhat/types";
+import { formatUnits } from "ethers";
+import { getContracts} from "./contracts";
+
+export async function checkApprovals(
+    tokenAddress: string,
+    permit2Address: string,
+    posmAddress: string,
+    ownerAddress: string,
+    provider: HardhatEthersProvider,
+
+) {
+    // 1. Setup Contracts
+
+    const tokenContract = new ethers.Contract(tokenAddress, _deployments_.ERC20_ABI, provider);
+    const permit2Contract = new ethers.Contract(permit2Address, _deployments_.PERMIT2_ABI, provider);
+
+    // 2. Fetch Layer 1: Token -> Permit2
+    // This is a standard ERC20 allowance. It usually doesn't have a deadline.
+    const tokenToPermit2 = await tokenContract.allowance(ownerAddress, permit2Address);
+
+    // 3. Fetch Layer 2: Permit2 -> Position Manager
+    // Permit2 returns a tuple: [amount, expiration, nonce]
+    const [p2ToPosmAmount, p2ToPosmExpiration] = await permit2Contract.allowance(
+        ownerAddress,
+        tokenAddress,
+        posmAddress
+    );
+
+    return {
+        tokenToPermit2,          // BigInt: Standard ERC20 allowance
+        p2ToPosmAmount,          // BigInt: Permit2's internal allowance for POSM
+        p2ToPosmExpiration       // Number: Unix timestamp when Permit2 allowance expires
+    };
+}
+
+export async function approveTokenWithPermit2(
+    permit2Address: string,
+    spender: string,
+    token: string,
+    tokenAmount: string | bigint,
+    signer: HardhatEthersSigner
+): Promise<void> {
+
+    const tokenContract = new ethers.Contract(
+        token, 
+        ["function approve(address spender, uint256 amount) public returns (bool)"], 
+        signer
+    );
+
+    console.log("Approving Permit2...");
+    const tx1 = await tokenContract.approve(permit2Address, tokenAmount);
+    await tx1.wait();
+
+    // 2. Approve Position Manager via Permit2
+    const permit2Abi = [
+        "function approve(address token, address spender, uint160 amount, uint48 expiration) external"
+    ];
+    const permit2Contract = new ethers.Contract(permit2Address, permit2Abi, signer);
+
+    console.log("Allowing Position Manager to use Permit2...");
+    const tx2 = await permit2Contract.approve(
+        token, 
+        spender, 
+        tokenAmount,
+        Math.floor(Date.now() / 1000) + 3600 // Expiration (1 hour)
+    );
+    await tx2.wait();
+}
+
+export const getPositionId = async(receipt: ContractTransactionReceipt | null) => {
+
+    // Find the Transfer event (topic[0] for Transfer is 0xddf2...)
+    console.log("logs: ", receipt?.logs);
+    const transferEvent = receipt?.logs.find(
+        log => log.address.toLowerCase() === _deployments_.POSITION_MANAGER_ADDRESS.toLowerCase()
+    );
+
+    if (transferEvent) {
+        // In ERC-721, the 3rd index (topic[3]) is the tokenId
+        const tokenId = BigInt(transferEvent.topics[3]);
+        console.log("Minted Token ID:", tokenId.toString());
+        return tokenId.toString();
+    };
+    
+}
+
+export const getLogEvents = async(logs: any, signer: HardhatEthersSigner) => {
+    const POOL_MANAGER_CONTRACT = new ethers.Contract(_deployments_.POOL_MANAGER_ADDRESS, _deployments_.POOL_MANAGER_ABI, signer);
+    logs.forEach((log: any) => {
+        try {
+            // Attempt to parse the log using the contract interface
+            const parsedLog = POOL_MANAGER_CONTRACT.interface.parseLog(log);
+            console.log("parsedLog: ", parsedLog)
+            
+            if (parsedLog) {
+                console.log(`Event Name: ${parsedLog.name}`);
+                console.log("Parsed Arguments:", parsedLog.args);
+                
+                // Access specific values (e.g., if the event is 'ModifyLiquidity')
+                console.log("Liquidity change:", parsedLog.args.liquidityDelta.toString());
+            }
+        } catch (error) {
+            // This log might belong to a different contract (e.g., an ERC20 transfer)
+            // parseLog throws an error if it doesn't recognize the event signature
+        }
+    });
+}
+
+// e.g -> IncreaseLiquidity(uint256,uint128,uint256,uint256)
+export const getEventSignature = (eventName: any, abi: any) => {
+    const eventAbi = abi.find((entry: any) => entry.name === eventName);
+    const types = eventAbi.inputs.map((input: any) => input.type);
+    return `${eventName}(${types.join(',')})`;
+}
+
+export const getPositionInfo = async(id: string | number, provider: HardhatEthersProvider) => {
+    const POSITION_MANAGER_CONTRACT = new ethers.Contract(_deployments_.POSITION_MANAGER_ADDRESS, _deployments_.POSITION_MANAGER_ABI, provider);
+    const [positionLiquidity, owner] = await Promise.all([
+        POSITION_MANAGER_CONTRACT.getPositionLiquidity(id),
+        POSITION_MANAGER_CONTRACT.ownerOf(id),
+     ])
+    return {positionLiquidity, owner};
+    
+}
+
+
+// export async function getFunds(MY_ADDRESS: any, amount: any, hre: HardhatRuntimeEnvironment) {
+   
+//     const { ethers, network } = hre;
+//     // const signer = (await ethers.getSigners())[0];
+//     const WHALE_ADDRESS = "0x28C6c06298d514Db089934071355E5743bf21d60"; // Binance
+
+//     // A. EXPLICITLY UNLOCK THE ACCOUNT
+//     await network.provider.request({
+//         method: "hardhat_impersonateAccount",
+//         params: [WHALE_ADDRESS],
+//     });
+
+//     // B. GIVE THE WHALE GAS (The "Safe-Bet" Step)
+//     // If the whale has 0 ETH, they can't pay for the USDC transfer.
+
+//     await network.provider.send("hardhat_setBalance", [
+//         WHALE_ADDRESS,
+//         "0x1000000000000000000", // 1 ETH  // "0x3635C9ADC5DEA00000", // 1000 ETH
+//     ]);
+
+//     // Get the Whale Signer
+//     // const whaleSigner = await ethers.getSigner(WHALE_ADDRESS);
+//     const whaleSigner = await ethers.getImpersonatedSigner(WHALE_ADDRESS);
+    
+
+//     console.log("Impersonation function")
+
+   
+
+//     // 2. Connect to the USDC Contract
+//     const { erc20Contract } = getContracts(whaleSigner);
+    
+//     console.log("Transferring USDC from whale...");
+//     // TypeScript tells us usdc is of type BaseContract, which does not have type-safe .transfer. Use any-cast or add ABI.
+//     const tx = await erc20Contract.transfer(MY_ADDRESS, amount);
+//     await tx.wait();
+//     console.log("Transfer done...");
+
+//     const myBalance = await erc20Contract.balanceOf(MY_ADDRESS);
+
+//     console.log(`Success! My balance: ${formatUnits(myBalance, 6)} USDC`);
+// }
+
+
+export async function getFunds(
+    MY_ADDRESS: string,
+    amount: string,
+    hre: HardhatRuntimeEnvironment
+  ) {
+    const { ethers, network } = hre;
+  
+    const WHALE_ADDRESS = "0xaD354CfBAa4A8572DD6Df021514a3931A8329Ef5"; // Binance
+  
+    // 1️⃣ Impersonate FIRST
+    await network.provider.request({
+      method: "hardhat_impersonateAccount",
+      params: [WHALE_ADDRESS],
+    });
+  
+    // 2️⃣ Fund whale for gas
+    await network.provider.send("hardhat_setBalance", [
+      WHALE_ADDRESS,
+      "0x3635C9ADC5DEA00000", // 1000 ETH
+    ]);
+  
+    // 3️⃣ Get signer AFTER impersonation
+    const whaleSigner = await ethers.getImpersonatedSigner(WHALE_ADDRESS);
+  
+    // 4️⃣ Get USDC contract CONNECTED to whale
+    const usdc = new ethers.Contract(_deployments_.USDC_ADDRESS, _deployments_.ERC20_ABI, whaleSigner);
+
+    const myBalanceBefore = await usdc.balanceOf(MY_ADDRESS);
+    console.log(`Success! My balance before: ${ethers.formatUnits(myBalanceBefore, 6)} USDC`);
+  
+    console.log("Transferring USDC from whale...");
+  
+    const tx = await usdc.transfer(
+      MY_ADDRESS,
+      amount
+    );
+    await tx.wait();
+  
+    // const myBalanceAfter = await usdc.balanceOf(MY_ADDRESS);
+    // console.log(`Success! My balance after: ${ethers.formatUnits(myBalanceAfter, 6)} USDC`);
+    // return myBalance;
+}
+  
+
+
+
+
+
+
+import { task } from "hardhat/config";
+import { HardhatEthersHelpers, HardhatRuntimeEnvironment } from "hardhat/types";
+import _deployments_ from "../deploy/deployments";
+import { HardhatEthersProvider } from "@nomicfoundation/hardhat-ethers/internal/hardhat-ethers-provider";
+import { LiquidityAmounts, getSqrtRatioAtTick, getTickAtSqrtRatio } from "../util/LiquidityAmounts";
+import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
+import { TickMath, FullMath} from "@uniswap/v3-sdk";
+import { Contract, parseEther, parseUnits, formatUnits, solidityPacked, AbiCoder, ZeroAddress } from "ethers";
+import JSBI from "jsbi";
+import { getContracts } from "../util/contracts";
+import { approveTokenWithPermit2, checkApprovals, getPositionInfo, getFunds } from "../util/helpers";
+
+
+
+const abi = AbiCoder.defaultAbiCoder();
+
+task("liquidity", "modify liquidities")
+  .setAction(async (_, hre: HardhatRuntimeEnvironment) => {
+
+    const { ethers, deployments } = hre;    
+
+    console.log("=== Initialize pool ===");
+    if (tokenA > tokenB) {
+        (token0, token1) = (tokenB, tokenA);
+    }
+
+
+
+    console.log("=== Get pool state ===");
+    
+
+
+    
+    const poolKey = {
+        currency0: _deployments_.ETH_ADDRESS,
+        currency1: _deployments_.USDC_ADDRESS,
+        fee: 3000,         // 0.3%
+        tickSpacing: 60,   // Standard spacing for 0.3% pools
+        hooks: _deployments_.ADDRESS_ZERO,
+    };
+    
+    const encodedPoolKey = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["address", "address", "uint24", "int24", "address"],
+        [poolKey.currency0, poolKey.currency1, poolKey.fee, poolKey.tickSpacing, poolKey.hooks]
+    );
+
+    // 4. Hash to get the PoolId
+    const poolId = ethers.keccak256(encodedPoolKey);
+
+    const { stateViewContract } = getContracts(ethers.provider);
+    const [slot0, liquidity] = await Promise.all([
+        stateViewContract.getSlot0(poolId, {
+          blockTag: "latest",
+        }),
+        stateViewContract.getLiquidity(poolId, {
+          blockTag: "latest",
+        }),
+    ])
+    console.log({slot0, liquidity, price: slot0[0]});
+
+    console.log("=== Get random position info ===");
+    const {positionLiquidity, owner} = await getPositionInfo(47, ethers.provider);
+    // console.log({positionLiquidity, owner});
+
+
+    console.log("=== Mint position and get position info ===");
+    const signer = (await ethers.getSigners())[0];
+    
+    // const tokenId = await mintPosition(poolKey, signer, ethers.provider, hre);
+    // console.log({tokenId})
+    const tokenId = 133559;
+    await increaseLiquidity(poolKey, signer, ethers.provider, hre, tokenId);
+
+  });
+
+
+  const mintPosition = async(poolKey: any, signer: HardhatEthersSigner, provider: HardhatEthersProvider, hre: HardhatRuntimeEnvironment) => {
+
+    let tokenId;
+
+    // should use actual price of eth/usdc from slot0, 
+    // lets hardcode for now
+
+    const tickSpacing = 60; // For a 0.3% fee pool
+
+    const getClosestTick = (tick: any, spacing: any) => Math.round(tick / spacing) * spacing;
+
+    const tickLower = getClosestTick(-196152, tickSpacing); // Results in -196140
+    const tickUpper = getClosestTick(-194244, tickSpacing); // Results in -194220
+
+ 
+
+    const sqrtPriceX96 = 4575172869933267616996182n // get real price
+    "1120455419495722798374638764549163435"
+                         
+    const currentTick = TickMath.getTickAtSqrtRatio(JSBI.BigInt(String(sqrtPriceX96)));
+
+
+    const sqrtPriceAX96 = BigInt((TickMath.getSqrtRatioAtTick(tickLower)).toString());
+    const sqrtPriceBX96 = BigInt((TickMath.getSqrtRatioAtTick(tickUpper)).toString());
+
+    const amount0Desired = parseUnits("15", 18);
+
+    // 2. Calculate Liquidity (L) ONLY from the ETH side
+    // This tells us: "How much 'pool depth' can 15 ETH provide in this range?"
+    const L = LiquidityAmounts.getLiquidityForAmount0(
+        sqrtPriceX96, 
+        sqrtPriceBX96, // Upper bound
+        amount0Desired
+    );
+
+    // 3. Calculate Amount 1 (USDC) ONLY from that L
+    // This tells us: "How much USDC is needed to match that pool depth?"
+    const amount1Required = LiquidityAmounts.getAmount1ForLiquidity(
+        sqrtPriceAX96, // Lower bound
+        sqrtPriceX96, 
+        L
+    );
+
+   console.log("ETH to deposit:", formatUnits(amount0Desired, 18));
+   console.log("USDC to deposit:", formatUnits(amount1Required, 6));
+
+
+
+    const amount0Max = amount0Desired + 1n; 
+    const amount1Max = amount1Required + 1n;  
+    console.log({
+
+        currentTick, tickLower, tickUpper, sqrtPriceAX96, sqrtPriceBX96,
+        amount0Max, amount1Max
+    })
+
+    // Transfer the funds ($50k)
+   const amount = parseUnits("50000", 6);
+
+   console.log("...................getFunds...................................")
+   await getFunds(signer.address, String(amount), hre);
+   //check usdc balance
+   const { erc20Contract } = getContracts(signer);
+   const myUSDCBalance = await erc20Contract.balanceOf(signer.address);
+   const myETHBalance = await provider.getBalance(signer.address);
+
+    console.log(`Success! My USDC balance: ${formatUnits(myUSDCBalance, 6)} USDC`);
+    console.log(`Success! My ETH balance: ${formatUnits(myETHBalance, 18)} ETH`);
+
+    // check approvals
+    const {
+       tokenToPermit2,          
+       p2ToPosmAmount,         
+       p2ToPosmExpiration     
+   } = await checkApprovals(
+       poolKey.currency1,
+       _deployments_.PERMIT2_ADDRESS,
+       _deployments_.POSITION_MANAGER_ADDRESS,
+       signer.address,
+       provider
+   );
+   console.log(
+       {
+           tokenToPermit2,          
+           p2ToPosmAmount,         
+           p2ToPosmExpiration    
+       }
+   )
+
+   if(p2ToPosmAmount === BigInt(0)) {
+        //call approve function
+        console.log("Hello")
+
+        await approveTokenWithPermit2(
+            _deployments_.PERMIT2_ADDRESS,
+            _deployments_.POSITION_MANAGER_ADDRESS,
+            poolKey.currency1,
+            amount1Max,
+            signer
+        );
+   }
+
+
+
+    const recipient = signer.address;
+    console.log("Recipient: ", recipient);
+
+    const actions = solidityPacked(
+        ["uint8", "uint8", "uint8"],
+        [_deployments_.ACTIONS.MINT_POSITION, _deployments_.ACTIONS.SETTLE_PAIR, _deployments_.ACTIONS.SWEEP]
+    );
+    // (poolKey, tickLower, tickUpper, liquidityAmount, amount0Initial, amount1Initial, address(this), Constants.ZERO_BYTES)
+    const params = [
+        abi.encode(
+          [
+            "tuple(address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks)", 
+            "int24", "int24", "uint256", "uint128", "uint128", "address", "bytes"
+          ],
+          [
+            [poolKey.currency0, poolKey.currency1, poolKey.fee, poolKey.tickSpacing, poolKey.hooks],
+            tickLower, tickUpper, L, amount0Max, amount1Max, recipient, "0x"
+          ]
+        ),
+        abi.encode(["address", "address"], [poolKey.currency0, poolKey.currency1]),
+        abi.encode(["address", "address"], [ZeroAddress, recipient])
+    ];
+
+    const unlockData = abi.encode(["bytes", "bytes[]"], [actions, params]);
+    // Define the deadline (e.g., 20 minutes from now)
+    const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
+
+    const POSITION_MANAGER_CONTRACT = new Contract(_deployments_.POSITION_MANAGER_ADDRESS, _deployments_.POSITION_MANAGER_ABI, signer);
+    const POOL_MANAGER_CONTRACT = new Contract(_deployments_.POOL_MANAGER_ADDRESS, _deployments_.POOL_MANAGER_ABI, signer);
+
+    
+
+    const tx = await POSITION_MANAGER_CONTRACT.modifyLiquidities(unlockData, deadline, {
+        value: amount0Max,
+    });
+
+    const receipt = await tx.wait();
+    console.log("Transaction confirmed:", receipt.hash);
+
+
+    // 2. Look for the Transfer event from the PositionManager contract
+    const transferLog = receipt.logs.find((log: any) => 
+        log.address.toLowerCase() === _deployments_.POSITION_MANAGER_ADDRESS.toLowerCase()
+    );
+    console.log({transferLog});
+
+    if (transferLog) {
+        const parsedLog = POSITION_MANAGER_CONTRACT.interface.parseLog(transferLog);
+        if (parsedLog && parsedLog.name === "Transfer") {
+            const tokenId_ = parsedLog.args.tokenId;
+            console.log("Newly Minted Position ID (TokenID):", tokenId_.toString());
+            tokenId = tokenId_.toString();
+        }
+    }
+
+
+
+    receipt.logs.forEach((log: any) => {
+        try {
+            // Attempt to parse the log using the contract interface
+            const parsedLog = POOL_MANAGER_CONTRACT.interface.parseLog(log);
+            // console.log("parsedLog: ", parsedLog)
+            
+            if (parsedLog) {
+                console.log(`Event Name: ${parsedLog.name}`);
+                console.log("Parsed Arguments:", parsedLog.args);
+                
+                // Access specific values (e.g., if the event is 'ModifyLiquidity')
+                console.log("Liquidity change:", parsedLog.args.liquidityDelta.toString());
+            }
+        } catch (error) {
+            // This log might belong to a different contract (e.g., an ERC20 transfer)
+            // parseLog throws an error if it doesn't recognize the event signature
+        }
+    });
+
+    // After you have your L (Liquidity), calculate the expected amounts
+    const [ amount0, amount1 ] = LiquidityAmounts.getAmountsForLiquidity(
+        sqrtPriceX96, 
+        sqrtPriceAX96, 
+        sqrtPriceBX96, 
+        L
+    );
+
+    console.log(`Actual tokens being moved: ${amount0} Token0, ${amount1} Token1`);
+    return tokenId;
+    
+    
+  }
+
+  const increaseLiquidity = async(poolKey: any, signer: HardhatEthersSigner, provider: HardhatEthersProvider, hre: HardhatRuntimeEnvironment, tokenId: any) => {
+
+    const tickSpacing = 60; // For a 0.3% fee pool
+
+    const getClosestTick = (tick: any, spacing: any) => Math.round(tick / spacing) * spacing;
+
+    const tickLower = getClosestTick(-196152, tickSpacing); // Results in -196140
+    const tickUpper = getClosestTick(-194244, tickSpacing); // Results in -194220
+
+ 
+
+    const sqrtPriceX96 = 4575172869933267616996182n // get real price
+                         
+    const currentTick = TickMath.getTickAtSqrtRatio(JSBI.BigInt(String(sqrtPriceX96)));
+
+
+    const sqrtPriceAX96 = BigInt((TickMath.getSqrtRatioAtTick(tickLower)).toString());
+    const sqrtPriceBX96 = BigInt((TickMath.getSqrtRatioAtTick(tickUpper)).toString());
+
+    const amount0Desired = parseUnits("5", 18);
+
+    // 2. Calculate Liquidity (L) ONLY from the ETH side
+    // This tells us: "How much 'pool depth' can 5 ETH provide in this range?"
+    const L = LiquidityAmounts.getLiquidityForAmount0(
+        sqrtPriceX96, 
+        sqrtPriceBX96, // Upper bound
+        amount0Desired
+    );
+
+    // 3. Calculate Amount 1 (USDC) ONLY from that L
+    // This tells us: "How much USDC is needed to match that pool depth?"
+    const amount1Required = LiquidityAmounts.getAmount1ForLiquidity(
+        sqrtPriceAX96, // Lower bound
+        sqrtPriceX96, 
+        L
+    );
+
+   console.log("ETH to deposit:", formatUnits(amount0Desired, 18));
+   console.log("USDC to deposit:", formatUnits(amount1Required, 6));
+
+   const amount0Max = amount0Desired + 1n; 
+    const amount1Max = amount1Required + 1n;  
+    console.log({
+
+        currentTick, tickLower, tickUpper, sqrtPriceAX96, sqrtPriceBX96,
+        amount0Max, amount1Max
+    })
+
+    // 3. Transfer the funds ($50k)
+   const amount = parseUnits("50000", 6);
+
+   console.log("...................getFunds...................................")
+   await getFunds(signer.address, String(amount), hre);
+   //check usdc balance
+   const { erc20Contract } = getContracts(signer);
+   const myUSDCBalance = await erc20Contract.balanceOf(signer.address);
+   const myETHBalance = await provider.getBalance(signer.address);
+
+    console.log(`Success! My USDC balance: ${formatUnits(myUSDCBalance, 6)} USDC`);
+    console.log(`Success! My ETH balance: ${formatUnits(myETHBalance, 18)} ETH`);
+
+    // check approvals
+    const {
+        tokenToPermit2,          
+        p2ToPosmAmount,         
+        p2ToPosmExpiration     
+    } = await checkApprovals(
+        poolKey.currency1,
+        _deployments_.PERMIT2_ADDRESS,
+        _deployments_.POSITION_MANAGER_ADDRESS,
+        signer.address,
+        provider
+    );
+    console.log(
+        {
+            tokenToPermit2,          
+            p2ToPosmAmount,         
+            p2ToPosmExpiration    
+        }
+    )
+ 
+    if(p2ToPosmAmount === BigInt(0)) {
+         //call approve function
+         console.log("Hello")
+ 
+         await approveTokenWithPermit2(
+             _deployments_.PERMIT2_ADDRESS,
+             _deployments_.POSITION_MANAGER_ADDRESS,
+             poolKey.currency1,
+             amount1Max,
+             signer
+         );
+    }
+    
+
+    const recipient = signer.address;
+    console.log("Recipient: ", recipient);
+
+    const actions = solidityPacked(
+        ["uint8", "uint8", "uint8"], 
+        [_deployments_.ACTIONS.INCREASE_LIQUIDITY, _deployments_.ACTIONS.SETTLE_PAIR, _deployments_.ACTIONS.SWEEP]
+    );
+
+    const params = [
+        abi.encode(
+            ["uint256", "uint256", "uint128", "uint128", "bytes"],
+           [tokenId, L, amount0Max, amount1Max, "0x"]
+        ),
+        abi.encode(["address", "address"], [poolKey.currency0, poolKey.currency1]),
+        abi.encode(["address", "address"], [ZeroAddress, recipient])
+    ];
+
+    const unlockData = abi.encode(["bytes", "bytes[]"], [actions, params]);
+    // Define the deadline (e.g., 20 minutes from now)
+    const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
+
+    const POSITION_MANAGER_CONTRACT = new Contract(_deployments_.POSITION_MANAGER_ADDRESS, _deployments_.POSITION_MANAGER_ABI, signer);
+    const POOL_MANAGER_CONTRACT = new Contract(_deployments_.POOL_MANAGER_ADDRESS, _deployments_.POOL_MANAGER_ABI, signer);
+
+    
+
+    const tx = await POSITION_MANAGER_CONTRACT.modifyLiquidities(unlockData, deadline, {
+        value: amount0Max,
+    });
+
+    const receipt = await tx.wait();
+    console.log("Transaction confirmed:", receipt.hash);
+    
+    
+
+    
+  }
+
+
+console.log("=== Increase position and get position info ===");
+
+
+
+const decodeEventLogs = async () => {
+
+    // onst receipt = await tx.wait();
+    // console.log("Transaction confirmed:", receipt.hash);
+
+    // read event to see info...
+    // console.log("modifyLiquidities logs: ", receipt?.logs);
+    // const transferEvent = receipt?.logs.find(
+    //     log => log.address.toLowerCase() === _deployments_.POSITION_MANAGER_ADDRESS.toLowerCase()
+    // );
+
+    // console.log("Number of logs found:", receipt.logs.length);
+    // const abiCoder = new ethers.AbiCoder();
+
+    // get event signature
+    // const eventSignature = "IncreaseLiquidity(uint256,uint128,uint256,uint256)"
+
+
+    // Decode indexed parameters
+    // const decodedId = abiCoder.decode(["bytes32"], receipt.logs[1].topics[1])[0];
+    // const decodedSender = abiCoder.decode(["address"], receipt.logs[1].topics[2])[0];
+
+    // console.log(decodedId, decodedSender)
+
+
+    // const decoded = abiCoder.decode(["int24", "int24", "int256", "bytes32"], receipt.logs[1].data);
+    // console.log("decoded: ", decoded);
+
+
+    // this.........................................
+    // const iface = new ethers.Interface([
+    //     "event ModifyLiquidity(bytes32 indexed id, address indexed sender, int24 tickLower, int24 tickUpper, int256 liquidityDelta, bytes32 salt)"
+    // ]);
+
+    // receipt.logs.forEach((log: any) => {
+    //     try {
+
+    //         // This one line decodes BOTH topics and data into a single object
+    //         const parsedLog = iface.parseLog({
+    //             topics: log.topics,
+    //             data: log.data
+    //         });
+            
+    //         console.log(parsedLog?.args.id);
+    //         console.log(parsedLog?.args.liquidityDelta);
+    //     } catch(error) {
+
+    //     }
+
+    // })
+    
+    // or.........................................
+
+    // receipt.logs.forEach((log: any) => {
+    //     try {
+    //         // Attempt to parse the log using the contract interface
+    //         const parsedLog = POOL_MANAGER_CONTRACT.interface.parseLog(log);
+    //         console.log("parsedLog: ", parsedLog)
+            
+    //         if (parsedLog) {
+    //             console.log(`Event Name: ${parsedLog.name}`);
+    //             console.log("Parsed Arguments:", parsedLog.args);
+                
+    //             // Access specific values (e.g., if the event is 'ModifyLiquidity')
+    //             console.log("Liquidity change:", parsedLog.args.liquidityDelta.toString());
+    //         }
+    //     } catch (error) {
+    //         // This log might belong to a different contract (e.g., an ERC20 transfer)
+    //         // parseLog throws an error if it doesn't recognize the event signature
+    //     }
+    // });
+    
+
+}
+
+// UNIVERSAL ROUTER
+
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.26;
+
+import {Test} from "forge-std/Test.sol";
+import {console} from "forge-std/Console.sol";
+import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+import {CurrencyLibrary, Currency} from "@uniswap/v4-core/src/types/Currency.sol";
+import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
+import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import {Constants} from "@uniswap/v4-core/test/utils/Constants.sol";
+import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
+import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
+import {Actions} from "v4-periphery/src/libraries/Actions.sol";
+import {PositionInfo, PositionInfoLibrary} from "v4-periphery/src/libraries/PositionInfoLibrary.sol";
+import {TickMath} from "@uniswap/v4-core/src/libraries/TickMath.sol";
+import {LiquidityAmounts} from "@uniswap/v4-core/test/utils/LiquidityAmounts.sol";
+import {IERC20Minimal} from "@uniswap/v4-core/src/interfaces/external/IERC20Minimal.sol";
+import {FullMath} from "@uniswap/v4-core/src/libraries/FullMath.sol";
+import {Position} from "@uniswap/v4-core/src/libraries/Position.sol";
+import {FixedPoint128} from "@uniswap/v4-core/src/libraries/FixedPoint128.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+
+import { UniversalRouter } from "@uniswap/universal-router/contracts/UniversalRouter.sol";
+import { Commands } from "@uniswap/universal-router/contracts/libraries/Commands.sol";
+import { IV4Router } from "@uniswap/v4-periphery/src/interfaces/IV4Router.sol";
+import { IV4Quoter } from "@uniswap/v4-periphery/src/interfaces/IV4Quoter.sol";
+import { IPermit2 } from "permit2/src/interfaces/IPermit2.sol";
+import {ModifyLiquidityParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
+
+import {BaseTest} from "./utils/BaseTest.sol";
+
+// using universal router
+// we need permit2, poolManager and router deployed
+
+contract Swap is BaseTest {
+
+    using PoolIdLibrary for PoolKey;
+    using StateLibrary for IPoolManager;
+
+
+    PoolKey poolKey;
+    Currency currency0;
+    Currency currency1;
+
+
+    function setUp() public {
+        console.log("============================================================");
+        deployArtifactsAndLabel();
+
+
+        (currency0, currency1) = deployCurrencyPair(vm.addr(1));
+        
+        console.log("=== Initialize pool ===");
+
+        poolKey = PoolKey({
+            currency0: currency0,
+            currency1: currency1,
+            fee: 3000,
+            tickSpacing: 60,
+            hooks: IHooks(address(0))
+        });
+        poolManager.initialize(poolKey, Constants.SQRT_PRICE_1_1);
+
+        console.log("=== Get pool info ===");
+        (uint160 sqrtPriceX96, int24 tick, uint24 protocolFee, uint24 lpFee) = poolManager.getSlot0(poolKey.toId());
+        console.log("sqrtPriceX96: ", sqrtPriceX96);
+        console.log("tick: ", tick);
+        console.log("protocolFee: ", protocolFee);
+        console.log("lpFee: ", lpFee);
+
+
+        console.log("=== Add liquidity ===");
+
+        bytes memory actions = abi.encodePacked(uint8(Actions.MINT_POSITION), uint8(Actions.SETTLE_PAIR), uint8(Actions.SWEEP));
+        bytes[] memory params = new bytes[](3);
+    
+        uint128 liquidityAmount = 100e18;
+        // int24 tickLower = -180;
+        // int24 tickUpper = 180;
+        int24 tickLower = TickMath.minUsableTick(60);  // ~-887220
+        int24 tickUpper = TickMath.maxUsableTick(60);  // ~887220     
+
+        (uint256 amount0Expected, uint256 amount1Expected) = LiquidityAmounts.getAmountsForLiquidity(
+            Constants.SQRT_PRICE_1_1,
+            TickMath.getSqrtPriceAtTick(tickLower),
+            TickMath.getSqrtPriceAtTick(tickUpper),
+            liquidityAmount
+        );
+        
+
+        params[0] = abi.encode(poolKey, tickLower, tickUpper, liquidityAmount, amount0Expected + 1, amount1Expected + 1, address(this), Constants.ZERO_BYTES);
+        params[1] = abi.encode(currency0, currency1);
+        params[2] = abi.encode(CurrencyLibrary.ADDRESS_ZERO, address(this));
+
+        uint256 deadline = block.timestamp + 60;
+        uint256 valueToPass = currency0.isAddressZero() ? (amount0Expected + 1) : 0;
+        positionManager.modifyLiquidities{value: valueToPass}(abi.encode(actions, params), deadline);
+        
+
+
+        console.log("============================================================");
+    }
+
+
+
+
+//   struct ExactInputSingleParams {
+//         PoolKey poolKey;
+//         bool zeroForOne;
+//         uint128 amountIn;
+//         uint128 amountOutMinimum;
+//         bytes hookData;
+//     }
+    function testswapExactInputSingle() public {
+        console.log("============================================================");
+
+        uint128 liquidity = poolManager.getLiquidity(poolKey.toId());
+        console.log("liquidity", liquidity);
+
+
+        console.log("=== Get pool info (liquidity and token reserves) ......important, yet to find how to get pool reserves...... ===");
+
+
+        bytes memory commands = abi.encodePacked(uint8(Commands.V4_SWAP));
+        // Encode V4Router actions
+        bytes memory actions = abi.encodePacked(
+            uint8(Actions.SWAP_EXACT_IN_SINGLE),
+            uint8(Actions.SETTLE_ALL),
+            uint8(Actions.TAKE_ALL)
+        );
+
+        bytes[] memory params = new bytes[](3);
+        uint128 amountIn = 2e18;
+
+        console.log("=== Get minAmountOut from quoter ===");
+  
+        (uint256 minAmountOut, uint256 gasEstimate) = quoter.quoteExactInputSingle
+        (IV4Quoter.QuoteExactSingleParams({
+            poolKey: poolKey,
+            zeroForOne: true,
+            exactAmount: amountIn,
+            hookData: bytes("")  
+        }));
+        console.log("Quote amountOut: ", minAmountOut);
+        console.log("Quote gasEstimate: ", gasEstimate);
+
+
+        // uint128 minAmountOut = 0;
+
+        // First parameter: swap configuration
+        params[0] = abi.encode(
+            IV4Router.ExactInputSingleParams({
+                poolKey: poolKey,
+                zeroForOne: true,           
+                amountIn: amountIn,          
+                amountOutMinimum: uint128(minAmountOut),
+                hookData: bytes("")            
+            })
+        );
+
+        params[1] = abi.encode(poolKey.currency0, amountIn);
+        params[2] = abi.encode(poolKey.currency1, minAmountOut);
+
+        bytes[] memory inputs = new bytes[](1);
+
+        // Combine actions and params into inputs
+        inputs[0] = abi.encode(actions, params);
+
+        
+        console.log("=== Approve tokens with permit2 ===");
+        uint48 expiration = uint48(block.timestamp + 30 minutes); // 1800 seconds
+        // uint48 expiration = uint48(block.timestamp + 1 days); // 86400 seconds
+        approveTokenWithPermit2(Currency.unwrap(poolKey.currency0), amountIn, expiration);
+        
+        console.log("=== Execute the swap ===");
+        uint256 token1Before = poolKey.currency1.balanceOf(address(this));
+
+        uint256 deadline = block.timestamp + 20;
+        router.execute(commands, inputs, deadline);
+
+        uint256 token1After = poolKey.currency1.balanceOf(address(this));
+        console.log("Amount out (token1After - token1Before): ", token1After - token1Before);
+        // require(amountOut >= minAmountOut, "Insufficient output amount");
+
+
+        console.log("============================================================");
+
+    }
+
+    function approveTokenWithPermit2(
+        address token,
+        uint160 amount,
+        uint48 expiration
+    ) internal {
+        IERC20(token).approve(address(permit2), type(uint256).max);
+        if (expiration == 0) {
+            expiration = uint48(block.timestamp + 30 minutes);
+        }
+        permit2.approve(token, address(router), amount, expiration);
+    }
+
+}
+
+////
+
+
+
+import { useState } from 'react';
+import { useAccount, usePublicClient, useWriteContract } from 'wagmi';
+import { encodePacked, encodeAbiParameters, parseUnits } from 'viem';
+import { useApproval } from '../shared/useApproval';
+import { UNIVERSALROUTER_ADDRESS, ACTIONS } from '../../lib/constants';
+import type { ToastType } from '../../components/Toast';
+import type { TokenConfig } from '@/config/tokens';
+import { encodeFunctionData, maxUint256 } from 'viem';
+
+const UNIVERSAL_ROUTER_ABI = [
+  {
+    type: 'function',
+    name: 'execute',
+    inputs: [
+      { name: 'commands', type: 'bytes', internalType: 'bytes' },
+      { name: 'inputs', type: 'bytes[]', internalType: 'bytes[]' },
+      { name: 'deadline', type: 'uint256', internalType: 'uint256' }
+    ],
+    outputs: [],
+    stateMutability: 'payable'
+  }
+] as const;
+
+interface ToastState {
+  show: boolean;
+  type: ToastType;
+  title: string;
+  message: string;
+  txHash?: string;
+}
+
+export interface SwapParams {
+  fromToken: TokenConfig;
+  toToken: TokenConfig;
+  poolFee: number;          // basis points, e.g. 3000
+  tickSpacing: number;
+  hooksAddress: string;
+  amountIn: string;          // input amount string
+  amountOut: string;         // output amount string
+  slippagePct: number;       // slippage percentage, e.g. 0.5
+  isExactInput: boolean;     // true if exact input, false if exact output
+}
+
+export function useSwap() {
+  const { address: userAddress } = useAccount();
+  const publicClient = usePublicClient();
+  const { writeContractAsync } = useWriteContract();
+  const { checkAllowance, approveTokenWithPermit2 } = useApproval();
+
+  const [toast, setToast] = useState<ToastState>({
+    show: false,
+    type: 'pending',
+    title: '',
+    message: '',
+    txHash: undefined,
+  });
+
+  const [isApproving, setIsApproving] = useState(false);
+  const [isSwapping, setIsSwapping] = useState(false);
+  const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
+
+  function showToast(
+    type: ToastType,
+    title: string,
+    message: string,
+    txHash?: string
+  ) {
+    setToast({ show: true, type, title, message, txHash });
+  }
+
+  function dismissToast() {
+    setToast(prev => ({ ...prev, show: false }));
+  }
+
+  const executeSwap = async (params: SwapParams) => {
+    if (!userAddress) {
+      showToast('error', 'Wallet Not Connected', 'Please connect your wallet to execute the swap.');
+      return;
+    }
+
+    if (!publicClient) {
+      showToast('error', 'Public Client Not Found', 'Unable to initialize public client.');
+      return;
+    }
+
+    try {
+      setIsSwapping(true);
+
+      const rawAmountIn = parseUnits(params.amountIn, params.fromToken.decimals);
+      const rawAmountOut = parseUnits(params.amountOut, params.toToken.decimals);
+
+
+      // 1. Calculate limits based on slippage
+      const slippageBps = BigInt(Math.round(params.slippagePct * 100)); // e.g. 50 bps for 0.5%
+
+       // Exact Input:  amountIn is exact, amountOutMinimum = rawAmountOut * (1 - slippage)
+      // Exact Output: amountOutMinimum is exact rawAmountOut, amountIn = rawAmountIn * (1 + slippage)
+      const amountIn = params.isExactInput
+        ? rawAmountIn
+        : (rawAmountIn * (10000n + slippageBps)) / 10000n;  // amountInMaximum
+      const amountOutMinimum = params.isExactInput
+        ? (rawAmountOut * (10000n - slippageBps)) / 10000n
+        : rawAmountOut;  // exact desired output
+
+
+
+      if (params.isExactInput) {
+        // minAmountOut = amountOut * (1 - slippagePct / 100)
+        amountOutMinimum = (rawAmountOut * (10000n - slippageBps)) / 10000n;
+      } else {
+        // maxAmountIn = amountIn * (1 + slippagePct / 100)
+        amountInLimit = (rawAmountIn * (10000n + slippageBps)) / 10000n;
+      }
+      console.log({
+        rawAmountOut: rawAmountOut.toString(),
+        amountOutLimitAfterSlippage: amountOutLimit.toString()
+      });
+
+      console.log('params.amountOut:', params.amountOut);
+      console.log('params.amountIn:', params.amountIn);
+
+      console.log('rawAmountIn:', rawAmountIn.toString());
+      console.log('rawAmountOut:', rawAmountOut.toString());
+      console.log('amountOutLimit:', amountOutLimit.toString());
+      console.log('fromToken decimals:', params.fromToken.decimals);
+      console.log('toToken decimals:', params.toToken.decimals);
+
+      console.log('Swap Parameters:', {
+        fromToken: params.fromToken.symbol,
+        toToken: params.toToken.symbol,
+        amountIn: params.amountIn,
+        amountOut: params.amountOut,
+        isExactInput: params.isExactInput,
+        amountInLimit: amountInLimit.toString(),
+        amountOutLimit: amountOutLimit.toString(),
+      });
+      console.log({
+        slippagePct: params.slippagePct,
+        slippageBps: slippageBps.toString()
+      });
+
+      // 2. Check and Approve Allowance (if fromToken is not native)
+      const isNative = params.fromToken.address === '0x0000000000000000000000000000000000000000';
+      if (!isNative) {
+        setIsApproving(true);
+        showToast('pending', 'Checking Allowance', 'Checking token approval for Universal Router...');
+
+        const { p2ToSpenderAmount, p2ToSpenderExpiration } = await checkAllowance(
+          params.fromToken.address,
+          userAddress,
+          UNIVERSALROUTER_ADDRESS as `0x${string}`
+        );
+        console.log({ p2ToSpenderAmount, p2ToSpenderExpiration })
+
+        const now = Math.floor(Date.now() / 1000);
+        const isExpired = p2ToSpenderExpiration <= now;;
+
+        const needsApproval = isExpired || p2ToSpenderAmount < rawAmountIn;
+
+        if (needsApproval) {
+          showToast('pending', 'Approving Token', `Approving Permit2 & Universal Router for ${params.fromToken.symbol}...`);
+          await approveTokenWithPermit2(
+            params.fromToken.address,
+            maxUint256,
+            UNIVERSALROUTER_ADDRESS as `0x${string}`
+          );
+        }
+        setIsApproving(false);
+      }
+
+      showToast('pending', 'Preparing Swap', 'Constructing transaction details...');
+
+      // 3. Build Universal Router execute payload
+      // Sort currencies to match PoolKey sorting
+      const zeroForOne = params.fromToken.address.toLowerCase() < params.toToken.address.toLowerCase();
+
+
+
+      const [currency0, currency1] = params.fromToken.address.toLowerCase() < params.toToken.address.toLowerCase()
+      ? [params.fromToken.address, params.toToken.address]
+      : [params.toToken.address, params.fromToken.address];
+
+      const poolKey = {
+        currency0: currency0 as `0x${string}`,
+        currency1: currency1 as `0x${string}`,
+        fee: Number(params.poolFee),
+        tickSpacing: Number(params.tickSpacing),
+        hooks: params.hooksAddress as `0x${string}`,
+      };  
+
+      console.log({ poolKey });
+
+      // V4_SWAP command is 0x10
+      const commands = '0x10';
+      // const commands = encodePacked(['uint8'], [0x10]);
+
+      // Build V4Router actions
+      // Exact Input Single: Action 0x06, settle all 0x0c, take all 0x0f
+      // Exact Output Single: Action 0x08, settle all 0x0c, take all 0x0f
+      const actionType = params.isExactInput ? ACTIONS.SWAP_EXACT_IN_SINGLE : ACTIONS.SWAP_EXACT_OUT_SINGLE;
+      const actions = encodePacked(
+        ['uint8', 'uint8', 'uint8'],
+        [actionType, ACTIONS.SETTLE_ALL, ACTIONS.TAKE_ALL]
+      );
+      console.log({ actions });
+
+      // Build parameter array
+      const paramsArray: `0x${string}`[] = [];
+
+
+      paramsArray[0] = encodeAbiParameters(
+        [
+          {
+            type: 'tuple',
+            components: [
+              {
+                name: 'poolKey',
+                type: 'tuple',
+                components: [
+                  { name: 'currency0', type: 'address' },
+                  { name: 'currency1', type: 'address' },
+                  { name: 'fee', type: 'uint24' },
+                  { name: 'tickSpacing', type: 'int24' },
+                  { name: 'hooks', type: 'address' }
+                ]
+              },
+              { name: 'zeroForOne', type: 'bool' },
+              { name: 'amountIn', type: 'uint128' },
+              { name: 'amountOutMinimum', type: 'uint128' },
+              { name: 'minHopPriceX36', type: 'uint128' },
+              { name: 'hookData', type: 'bytes' }
+            ]
+          }
+        ],
+        [
+          {
+            poolKey,
+            zeroForOne,
+            amountIn,
+            amountOutMinimum,
+            minHopPriceX36: 0n,
+            hookData: '0x'
+          }
+        ]
+      );
+
+      // SETTLE_ALL - input token (sorted currency0)
+      paramsArray[1] = encodeAbiParameters(
+        [{ type: 'address' }, { type: 'uint256' }],
+        [params.fromToken.address as `0x${string}`, amountIn]
+      );
+
+      // TAKE_ALL - output token (sorted currency1)  
+      paramsArray[2] = encodeAbiParameters(
+        [{ type: 'address' }, { type: 'uint256' }],
+        [params.toToken.address as `0x${string}`, amountOutMinimum]
+      );
+
+
+      console.log({ params })
+
+      const v4Input = encodeAbiParameters(
+        [
+          { name: 'actions', type: 'bytes' },
+          { name: 'params', type: 'bytes[]' }
+        ],
+        [actions, paramsArray]
+      );
+
+      const inputs = [v4Input];
+
+      console.log({ inputs });
+
+      const deadline = BigInt(Math.floor(Date.now() / 1000) + 60 * 20); // 20 minute deadline
+
+      // If fromToken is native ETH, we pass it as value
+      const value = isNative ? amountIn : 0n;
+
+      showToast('pending', 'Confirming Transaction', 'Confirm the swap transaction in your wallet...');
+
+      ////////////////////////////////////////////
+      try {
+        const result = await publicClient.call({
+          account: userAddress,
+          to: UNIVERSALROUTER_ADDRESS as `0x${string}`,
+          data: encodeFunctionData({
+            abi: UNIVERSAL_ROUTER_ABI,
+            functionName: 'execute',
+            args: [commands, inputs, deadline],
+          }),
+          value,
+        });
+        console.log('call result:', result);
+      } catch (callError: any) {
+        console.log('call error data:', callError?.cause?.data);
+        console.log('call error details:', JSON.stringify(callError, null, 2));
+      }
+
+
+      // 4. Simulate contract execution to ensure safety
+      try {
+        await publicClient.simulateContract({
+          address: UNIVERSALROUTER_ADDRESS as `0x${string}`,
+          abi: UNIVERSAL_ROUTER_ABI,
+          functionName: 'execute',
+          args: [commands, inputs, deadline],
+          value,
+          account: userAddress,
+        });
+      } catch (simError: any) {
+        console.error('Swap Simulation Error:', simError);
+      }
+
+      // 5. Submit transaction
+      const hash = await writeContractAsync({
+        address: UNIVERSALROUTER_ADDRESS as `0x${string}`,
+        abi: UNIVERSAL_ROUTER_ABI,
+        functionName: 'execute',
+        args: [commands, inputs, deadline],
+        value,
+      });
+
+      setTxHash(hash);
+      showToast('pending', 'Transaction Submitted', 'Waiting for confirmation...', hash);
+
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      console.log('Swap transaction receipt:', receipt);
+
+      if (receipt.status === 'reverted') {
+        throw new Error('Transaction reverted on-chain');
+      }
+
+      showToast('success', 'Swap Successful!', `Successfully swapped ${params.amountIn} ${params.fromToken.symbol} for ${params.amountOut} ${params.toToken.symbol}!`, hash);
+    } catch (err: any) {
+      console.error('Failed to execute swap:', err);
+      showToast('error', 'Transaction Failed', err?.shortMessage ?? err?.message ?? 'Failed to execute swap.');
+    } finally {
+      setIsSwapping(false);
+      setIsApproving(false);
+    }
+  };
+
+  return {
+    executeSwap,
+    toast,
+    dismissToast,
+    isApproving,
+    isSwapping,
+    isConfirming: isSwapping || isApproving,
+    txHash,
+  };
+}
+
+
+
+
+# Mint Position (/docs/protocols/v4/guides/managing-liquidity/mint-position)
+
+Mint a new Uniswap v4 liquidity position using PositionManager command encoding.
+
+Similar to Uniswap v3, liquidity positions are minted as ERC-721 tokens and depend on a *periphery* contract.
+v4's `PositionManager` contract will facilitate liquidity management
+
+## Context
+Please note that `PositionManager` is a command-based contract, where integrators will be encoding commands and their corresponding
+parameters.
+
+## Setup
+See the [setup guide](/docs/protocols/v4/guides/managing-liquidity/getting-started)
+
+## Guide
+Below is a step-by-step guide for minting a v4 liquidity position, in *solidity*
+
+## 1. Import and define IPositionManager
+```solidity
+import {IPositionManager} from "v4-periphery/src/interfaces/IPositionManager.sol";
+
+// inside a contract, test, or foundry script:
+IPositionManager posm = IPositionManager(<address>);
+```
+
+## 2. Encode actions
+To mint a position, two actions are required:
+
+* mint operation - the creation of the liquidity position
+* settle pair - the two tokens to be paid by msg.sender
+
+**If providing ETH liquidity, a third action is required:**
+
+* sweep - to recover excess eth sent to the position manager
+
+```solidity
+import {Actions} from "v4-periphery/src/libraries/Actions.sol";
+
+bytes memory actions = abi.encodePacked(uint8(Actions.MINT_POSITION), uint8(Actions.SETTLE_PAIR));
+
+// For ETH liquidity positions
+bytes memory actions = abi.encodePacked(uint8(Actions.MINT_POSITION), uint8(Actions.SETTLE_PAIR), uint8(Actions.SWEEP));
+```
+
+## 3. Encode parameters
+```solidity
+bytes[] memory params = new bytes[](2); // new bytes[](3) for ETH liquidity positions
+```
+
+The `MINT_POSITION` action requires the following parameters:
+
+| Parameter    | Type      | Description                                                    |
+| ------------ | --------- | -------------------------------------------------------------- |
+| `poolKey`    | *PoolKey* | where the liquidity will be added to                           |
+| `tickLower`  | *int24*   | the lower tick boundary of the position                        |
+| `tickUpper`  | *int24*   | the upper tick boundary of the position                        |
+| `liquidity`  | *uint256* | the amount of liquidity units to mint                          |
+| `amount0Max` | *uint128* | the maximum amount of currency0 msg.sender is willing to pay   |
+| `amount1Max` | *uint128* | the maximum amount of currency1 msg.sender is willing to pay   |
+| `recipient`  | *address* | the address that will receive the liquidity position (ERC-721) |
+| `hookData`   | *bytes*   | arbitrary data that will be forwarded to hook functions        |
+
+```solidity
+Currency currency0 = Currency.wrap(<tokenAddress1>); // tokenAddress1 = 0 for native ETH
+Currency currency1 = Currency.wrap(<tokenAddress2>);
+PoolKey poolKey = PoolKey(currency0, currency1, 3000, 60, IHooks(hook));
+
+params[0] = abi.encode(poolKey, tickLower, tickUpper, liquidity, amount0Max, amount1Max, recipient, hookData);
+```
+
+The `SETTLE_PAIR` action requires the following parameters:
+
+* `currency0` - *Currency*, one of the tokens to be paid by msg.sender
+* `currency1` - *Currency*, the other token to be paid by msg.sender
+
+```solidity
+params[1] = abi.encode(currency0, currency1);
+```
+
+The `SWEEP` action requires the following parameters:
+
+* `currency` - *Currency*, token to sweep - most commonly native Ether: `CurrencyLibrary.ADDRESS_ZERO`
+* `recipient` - *address*, where to send excess tokens
+
+```solidity
+params[2] = abi.encode(currency, recipient);
+```
+
+## 4. Submit call
+The entrypoint for all liquidity operations is `modifyLiquidities()`
+
+```solidity
+uint256 deadline = block.timestamp + 60;
+
+uint256 valueToPass = currency0.isAddressZero() ? amount0Max : 0;
+
+posm.modifyLiquidities{value: valueToPass}(
+    abi.encode(actions, params),
+    deadline
+);
+```
+
+## Additional Notes:
+* To obtain balance changes, callers should read token balances before and after the `.modifyLiquidities()` call
+
+
+
+
+
+# Increase Liquidity (v4) (/docs/protocols/v4/guides/managing-liquidity/increase-liquidity)
+
+Increase an existing Uniswap v4 position by encoding PositionManager actions and submitting `modifyLiquidities()`.
+
+## Context
+Please note that `PositionManager` is a command-based contract, where integrators will be encoding commands and their corresponding
+parameters.
+
+Increasing liquidity assumes the position already exists and the user wants to add more tokens to the position.
+
+## Setup
+See the [setup guide](/docs/protocols/v4/guides/managing-liquidity/getting-started)
+
+## Guide
+Below is a step-by-step guide for increasing a position's liquidity, in *solidity*.
+
+## 1. Import and define IPositionManager
+```solidity
+import {IPositionManager} from "v4-periphery/src/interfaces/IPositionManager.sol";
+
+// inside a contract, test, or foundry script:
+IPositionManager posm = IPositionManager(<address>);
+```
+
+## 2. Encode actions
+To increase a position's liquidity, the first action must be:
+
+* *increase* operation - the addition of liquidity to an existing position.
+
+For *delta resolving* operations, developers may need to choose between `SETTLE_PAIR`, `CLOSE_CURRENCY`, or `CLEAR_OR_TAKE` actions.
+
+> In Uniswap v4, fee revenue is automatically credited to a position on increasing liquidity
+
+> There are some cases, where the fee revenue can entirely "pay" for a liquidity increase, and remainder tokens need to be collected
+
+If increasing the liquidity requires the transfer of both tokens:
+
+* *settle pair* - pays a pair of tokens, to increase liquidity
+
+**If increasing the liquidity for ETH positions, a third action is required:**
+
+* *sweep* - to recover excess eth sent to the position manager
+
+Otherwise:
+
+* *close currency* - automatically determines if a currency should be settled or taken.
+* OR *clear or take* - if the token amount to-be-collected is below a threshold, opt to forfeit the dust. Otherwise, claim the tokens
+
+```solidity
+import {Actions} from "v4-periphery/src/libraries/Actions.sol";
+```
+
+If both tokens need to be sent:
+
+```solidity
+bytes memory actions = abi.encodePacked(uint8(Actions.INCREASE_LIQUIDITY), uint8(Actions.SETTLE_PAIR));
+```
+
+If increasing liquidity for ETH positions:
+
+```solidity
+bytes memory actions = abi.encodePacked(uint8(Actions.INCREASE_LIQUIDITY), uint8(Actions.SETTLE_PAIR), uint8(Actions.SWEEP));
+```
+
+If converting fees to liquidity, and expect excess fees to be collected
+
+```solidity
+bytes memory actions = abi.encodePacked(uint8(Actions.INCREASE_LIQUIDITY), uint8(Actions.CLOSE_CURRENCY), uint8(Actions.CLOSE_CURRENCY));
+```
+
+If converting fees to liquidity, forfeiting dust:
+
+```solidity
+bytes memory actions = abi.encodePacked(uint8(Actions.INCREASE_LIQUIDITY), uint8(Actions.CLEAR_OR_TAKE), uint8(Actions.CLEAR_OR_TAKE));
+```
+
+## 3. Encoded parameters
+When settling pair (for non-ETH positions):
+
+```solidity
+bytes[] memory params = new bytes[](2);
+```
+
+Otherwise:
+
+```solidity
+bytes[] memory params = new bytes[](3);
+```
+
+The `INCREASE_LIQUIDITY` action requires the following parameters:
+
+| Parameter    | Type      | Description                                                            |
+| ------------ | --------- | ---------------------------------------------------------------------- |
+| `tokenId`    | *uint256* | position identifier                                                    |
+| `liquidity`  | *uint256* | the amount of liquidity to add                                         |
+| `amount0Max` | *uint128* | the maximum amount of currency0 liquidity msg.sender is willing to pay |
+| `amount1Max` | *uint128* | the maximum amount of currency1 liquidity msg.sender is willing to pay |
+| `hookData`   | *bytes*   | arbitrary data that will be forwarded to hook functions                |
+
+```solidity
+params[0] = abi.encode(tokenId, liquidity, amount0Max, amount1Max, hookData);
+```
+
+The `SETTLE_PAIR` action requires the following parameters:
+
+* `currency0` - *Currency*, one of the tokens to be paid by msg.sender
+* `currency1` - *Currency*, the other token to be paid by msg.sender
+
+In the above case, the parameter encoding is:
+
+```solidity
+Currency currency0 = Currency.wrap(<tokenAddress1>); // tokenAddress1 = 0 for native ETH
+Currency currency1 = Currency.wrap(<tokenAddress2>);
+params[1] = abi.encode(currency0, currency1);
+```
+
+The `SWEEP` action requires the following parameters:
+
+* `currency` - *Currency*, token to sweep - most commonly native Ether: `CurrencyLibrary.ADDRESS_ZERO`
+* `recipient` - *address*, where to send excess tokens
+
+In this case, the parameter encoding is:
+
+```solidity
+params[2] = abi.encode(currency, recipient);
+```
+
+The `CLOSE_CURRENCY` action requires only one `currency` parameter
+and the encoding is:
+
+```solidity
+params[1] = abi.encode(currency0)
+params[2] = abi.encode(currency1)
+```
+
+The `CLEAR_OR_TAKE` action requires one `currency` and:
+
+* `amountMax` - *uint256*, the maximum threshold to concede dust,
+  otherwise taking the dust.
+
+In this case, the parameter encoding is:
+
+```solidity
+params[1] = abi.encode(currency0, amount0Max);
+params[2] = abi.encode(currency1, amount1Max);
+```
+
+## 4. Submit call
+The entrypoint for all liquidity operations is `modifyLiquidities()`.
+
+```solidity
+uint256 deadline = block.timestamp + 60;
+
+uint256 valueToPass = currency0.isAddressZero() ? amount0Max : 0;
+
+posm.modifyLiquidities{value: valueToPass}(
+    abi.encode(actions, params),
+    deadline
+);
+```
+
+
+
+# Decrease Liquidity (/docs/protocols/v4/guides/managing-liquidity/decrease-liquidity)
+
+Decrease an existing Uniswap v4 position by encoding PositionManager actions and calling `modifyLiquidities()`.
+
+## Context
+Please note that `PositionManager` is a command-based contract, where integrators will be encoding commands and their corresponding
+parameters.
+
+Decreasing liquidity assumes the position already exists and the user wants to remove tokens from the position.
+
+## Setup
+See the [setup guide](/docs/protocols/v4/guides/managing-liquidity/getting-started)
+
+## Guide
+Below is a step-by-step guide for decreasing a position's liquidity, in *solidity*.
+
+## 1. Import and define IPositionManager
+```solidity
+import {IPositionManager} from "v4-periphery/src/interfaces/IPositionManager.sol";
+
+// inside a contract, test, or foundry script:
+IPositionManager posm = IPositionManager(<address>);
+```
+
+## 2. Encode actions
+To decrease a position's liquidity, the first action must be:
+
+* *decrease* operation - the subtraction of liquidity to an existing position.
+
+For *delta resolving* operations, developers may need to choose between `TAKE_PAIR`, `CLOSE_CURRENCY`, or `CLEAR_OR_TAKE` actions.
+
+> In Uniswap v4, fee revenue is automatically debited to a position on decreasing liquidity
+
+If decreasing the liquidity requires the transfer of both tokens:
+
+* *take pair* - receives a pair of tokens, to decrease liquidity
+
+Otherwise:
+
+* *clear or take* - if the token amount to-be-collected is below a threshold, opt to forfeit the dust. Otherwise, claim the tokens
+
+```solidity
+import {Actions} from "v4-periphery/src/libraries/Actions.sol";
+```
+
+If both tokens need to be sent:
+
+```solidity
+bytes memory actions = abi.encodePacked(uint8(Actions.DECREASE_LIQUIDITY), uint8(Actions.TAKE_PAIR));
+```
+
+If converting fees to liquidity, forfeiting dust:
+
+```solidity
+bytes memory actions = abi.encodePacked(uint8(Actions.DECREASE_LIQUIDITY), uint8(Actions.CLEAR_OR_TAKE), uint8(Actions.CLEAR_OR_TAKE));
+```
+
+## 3. Encoded parameters
+When taking pair:
+
+```solidity
+bytes[] memory params = new bytes[](2);
+```
+
+Otherwise:
+
+```solidity
+bytes[] memory params = new bytes[](3);
+```
+
+The `DECREASE_LIQUIDITY` action requires the following parameters:
+
+| Parameter    | Type      | Description                                                                |
+| ------------ | --------- | -------------------------------------------------------------------------- |
+| `tokenId`    | *uint256* | position identifier                                                        |
+| `liquidity`  | *uint256* | the amount of liquidity to remove                                          |
+| `amount0Min` | *uint128* | the minimum amount of currency0 liquidity msg.sender is willing to receive |
+| `amount1Min` | *uint128* | the minimum amount of currency1 liquidity msg.sender is willing to receive |
+| `hookData`   | *bytes*   | arbitrary data that will be forwarded to hook functions                    |
+
+```solidity
+params[0] = abi.encode(tokenId, liquidity, amount0Min, amount1Min, hookData);
+```
+
+The `TAKE_PAIR` action requires the following parameters:
+
+* `currency0` - *Currency*, one of the tokens to be received
+* `currency1` - *Currency*, the other token to be received
+* `recipient` - *Recipient*, the recipient to receive the tokens
+
+In the above case, the parameter encoding is:
+
+```solidity
+Currency currency0 = Currency.wrap(<tokenAddress1>); // tokenAddress1 = 0 for native ETH
+Currency currency1 = Currency.wrap(<tokenAddress2>);
+params[1] = abi.encode(currency0, currency1, recipient);
+```
+
+The `CLEAR_OR_TAKE` action requires one `currency` and:
+
+* `amountMax` - *uint256*, the maximum threshold to concede dust,
+  otherwise taking the dust.
+
+In this case, the parameter encoding is:
+
+```solidity
+params[1] = abi.encode(currency0, amount0Max);
+params[2] = abi.encode(currency1, amount1Max);
+```
+
+## 4. Submit call
+The entrypoint for all liquidity operations is `modifyLiquidities()`.
+
+```solidity
+uint256 deadline = block.timestamp + 60;
+
+uint256 valueToPass = currency0.isAddressZero() ? amount0Max : 0;
+
+posm.modifyLiquidities{value: valueToPass}(
+    abi.encode(actions, params),
+    deadline
+);
+```
+
+
+# Calculate LP Fees (/docs/protocols/v4/guides/managing-liquidity/calculate-fees)
+
+Calculate uncollected and lifetime LP fees for Uniswap v4 positions.
+
+## Introduction
+With hooks introduced in v4, [Dynamic Fees](/docs/protocols/v4/concepts/dynamic-fees) are possible and allow v4 pools to use more flexible fee structures than v3 pools with static tiers (0.05%, 0.3%, 1%).
+
+While in v3 we can get the amount for the fees claimed on each liquidity operation in the `Collect` event, in v4 with dynamic fees, swap fees are directly accrued to liquidity positions and can be further handled by hooks at *`afterModifyLiquidity`* - thus we should not emit `feesAccrued` in the event `ModifiyLiquidity`. This not only saves gas on event emission but more importantly avoid causing confusion since the amount of `feesAccrued` could be changed as a result of hook execution.
+
+```solidity
+// Modify liquidity in v4
+function modifyLiquidity(PoolKey memory key, IPoolManager.ModifyLiquidityParams memory params, bytes calldata hookData) 
+    // ... 
+    returns (BalanceDelta callerDelta, BalanceDelta feesAccrued) 
+{
+    PoolId id = key.toId();
+    {
+        // ... (other code)
+        BalanceDelta principalDelta;
+        (principalDelta, feesAccrued) = pool.modifyLiquidity(
+            // ... (the ModifyLiquidityParams)
+        );
+        callerDelta = principalDelta + feesAccrued;
+    }
+
+    // event is emitted before the afterModifyLiquidity call to ensure events are always emitted in order
+    emit ModifyLiquidity(id, msg.sender, params.tickLower, params.tickUpper, params.liquidityDelta, params.salt);
+
+    BalanceDelta hookDelta;
+    (callerDelta, hookDelta) = key.hooks.afterModifyLiquidity(key, params, callerDelta, feesAccrued, hookData);
+    // ... (other code)
+}
+```
+
+In this guide we will go through how you can calculate fees earned for a LP position in v4 specifically the **uncollected fees** and **total lifetime fees**.
+
+## Contract Setup
+Import the necessary dependencies and prepare the function signature for `getUncollectedFees` and `getLifetimeFees`.
+
+```solidity
+pragma solidity ^0.8.24;
+
+import {FullMath} from "@uniswap/v4-core/src/libraries/FullMath.sol";
+import {FixedPoint128} from "@uniswap/v4-core/src/libraries/FixedPoint128.sol";
+import {Position} from "@uniswap/v4-core/src/libraries/Position.sol";
+import {SafeCast} from "@uniswap/v4-core/src/libraries/SafeCast.sol";
+import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
+import {BalanceDelta, toBalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
+import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
+import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+
+import {IPositionManager} from "src/interfaces/IPositionManager.sol";
+import {PositionConfig} from "src/types/PositionConfig.sol";
+
+contract CalculateFeeExample {
+    using SafeCast for uint256;
+    using StateLibrary for IPoolManager;
+
+    IPositionManager posm = IPositionManager(<POSM_ADDRESS>);
+    IPoolManager manager = IPoolManager(<POOL_MANAGER_ADDRESS>);
+
+    function getUncollectedFees(PositionConfig memory config, uint256 tokenId)
+        external
+        view
+        returns (BalanceDelta uncollectedFees) {}
+
+    function getLifetimeFees(PositionConfig memory config, uint256 tokenId)
+        external
+        view
+        returns (BalanceDelta lifetimeFees) {}
+}
+```
+
+## Calculate uncollected fees for an LP position
+In `getUncollectedFees(PositionConfig config, uint256 tokenId)`:
+
+1. Get the last recorded fee growth in `currency0` and `currency1` per unit of liquidity from `tickLower` to `tickUpper`
+
+```solidity
+PoolId poolId = config.poolKey.toId();
+
+// getPositionInfo(poolId, owner, tL, tU, salt)
+// owner is the position manager, salt is the tokenId
+(uint128 liquidity, uint256 feeGrowthInside0LastX128, uint256 feeGrowthInside1LastX128) =
+    manager.getPositionInfo(poolId, address(posm), config.tickLower, config.tickUpper, bytes32(tokenId));
+```
+
+2. Get the all-time fee growth in `currency0` and `currency1` per unit of liquidity from `tickLower` to `tickUpper`
+
+```solidity
+(uint256 feeGrowthInside0X128, uint256 feeGrowthInside1X128) = 
+    manager.getFeeGrowthInside(poolId, config.tickLower, config.tickUpper);
+```
+
+3. Compare the *all-time feeGrowthInside* from step 2 against the *last recorded feeGrowthInside* from step 1, and convert it to token amount
+
+```solidity
+uint128 tokenAmount =
+    (FullMath.mulDiv(feeGrowthInsideX128 - feeGrowthInsideLastX128, liquidity, FixedPoint128.Q128)).toUint128();
+```
+
+## Calculate lifetime fees earned for an LP range
+Create a new function `getLifetimeFee(PositionConfig config, uint256 tokenId)`:
+
+1. Get the all-time fee growth in `currency0` and `currency1` per unit of liquidity from `tickLower` to `tickUpper`
+
+```solidity
+(uint256 feeGrowthInside0X128, uint256 feeGrowthInside1X128) = 
+    manager.getFeeGrowthInside(poolId, config.tickLower, config.tickUpper);
+```
+
+2. Convert it to token amount
+
+```solidity
+uint128 tokenAmount =
+    (FullMath.mulDiv(feeGrowthInsideX128, liquidity, FixedPoint128.Q128)).toUint128();
+```
+
+## Full Contract
+```solidity
+pragma solidity ^0.8.24;
+
+import {FullMath} from "@uniswap/v4-core/src/libraries/FullMath.sol";
+import {FixedPoint128} from "@uniswap/v4-core/src/libraries/FixedPoint128.sol";
+import {Position} from "@uniswap/v4-core/src/libraries/Position.sol";
+import {SafeCast} from "@uniswap/v4-core/src/libraries/SafeCast.sol";
+import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
+import {BalanceDelta, toBalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
+import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
+import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
+
+import {IPositionManager} from "src/interfaces/IPositionManager.sol";
+import {PositionConfig} from "src/types/PositionConfig.sol";
+
+contract CalculateFeeExample {
+    using SafeCast for uint256;
+    using StateLibrary for IPoolManager;
+
+    IPositionManager posm = IPositionManager(<POSM_ADDRESS>);
+    IPoolManager manager = IPoolManager(<POOL_MANAGER_ADDRESS>);
+
+    function getUncollectedFees(PositionConfig memory config, uint256 tokenId)
+        external
+        view
+        returns (BalanceDelta uncollectedFees) {
+
+        PoolId poolId = config.poolKey.toId();
+
+        (uint128 liquidity, uint256 feeGrowthInside0LastX128, uint256 feeGrowthInside1LastX128) =
+            manager.getPositionInfo(poolId, address(posm), config.tickLower, config.tickUpper, bytes32(tokenId));
+        (uint256 feeGrowthInside0X128, uint256 feeGrowthInside1X128) =
+            manager.getFeeGrowthInside(poolId, config.tickLower, config.tickUpper);
+
+        uncollectedFees = _convertFeesToBalanceDelta(
+            feeGrowthInside0X128 - feeGrowthInside0LastX128, feeGrowthInside1X128 - feeGrowthInside1LastX128, liquidity);
+    }
+
+    function getLifetimeFees(PositionConfig memory config, uint256 tokenId)
+        external
+        view
+        returns (BalanceDelta lifetimeFees) {
+
+        PoolId poolId = config.poolKey.toId();
+
+        (uint128 liquidity,,) = manager.getPositionInfo(poolId, address(posm), config.tickLower, config.tickUpper, bytes32(tokenId));
+        (uint256 feeGrowthInside0X128, uint256 feeGrowthInside1X128) =
+            manager.getFeeGrowthInside(poolId, config.tickLower, config.tickUpper);
+
+        lifetimeFees = _convertFeesToBalanceDelta(feeGrowthInside0X128, feeGrowthInside1X128, liquidity);
+    }
+
+    function _convertFeesToBalanceDelta(uint256 feeGrowthInside0X128, uint256 feeGrowthInside1X128, uint256 liquidity) 
+        internal
+        view 
+        returns (BalanceDelta feesInBalanceDelta) {
+            
+        uint128 token0Amount = (FullMath.mulDiv(feeGrowthInside0X128, liquidity, FixedPoint128.Q128)).toUint128();
+        uint128 token1Amount = (FullMath.mulDiv(feeGrowthInside1X128, liquidity, FixedPoint128.Q128)).toUint128();
+        feesInBalanceDelta = toBalanceDelta(uint256(token0Amount).toInt128(), uint256(token1Amount).toInt128());
+    }
+}
+```
+
+
+# Collect Fees (/docs/protocols/v4/guides/managing-liquidity/collect-fees)
+
+Collect accrued fees from an existing Uniswap v4 position through PositionManager actions.
+
+## Setup
+See the [setup guide](/docs/protocols/v4/guides/managing-liquidity/getting-started)
+
+## Guide
+In order to collect fees, the integrator must execute encoded actions
+using the `PositionManager` contract. **Note** that there is no
+`COLLECT` command, instead developers must decrease liquidity with a zero
+liquidity change.
+
+## 1. Import and define IPositionManager
+```solidity
+import {IPositionManager} from "v4-periphery/src/interfaces/IPositionManager.sol";
+// inside a contract, test, or foundry script:
+IPositionManager posm = IPositionManager(<address>);
+```
+
+## 2. Encode actions
+To collect fees, the following operations are required:
+
+* decrease liquidity - collect fees from the core contract
+* take pair - transfer the fee revenue, as both tokens, to a recipient
+
+```solidity
+import {Actions} from "v4-periphery/src/libraries/Actions.sol";
+bytes memory actions = abi.encodePacked(uint8(Actions.DECREASE_LIQUIDITY), uint8(Actions.TAKE_PAIR));
+```
+
+## 3. Encode parameters
+```solidity
+bytes[] memory params = new bytes[](2);
+```
+
+The `DECREASE_LIQUIDITY` action requires the following parameters:
+
+| Parameter    | Type      | Description                                                                   |
+| ------------ | --------- | ----------------------------------------------------------------------------- |
+| `tokenId`    | *uint256* | position identifier                                                           |
+| `liquidity`  | *uint256* | the amount of liquidity to withdraw                                           |
+| `amount0Min` | *uint128* | the minimum amount of currency0 liquidity msg.sender is expecting to get back |
+| `amount1Min` | *uint128* | the minimum amount of currency1 liquidity msg.sender is expecting to get back |
+| `hookData`   | *bytes*   | arbitrary data that will be forwarded to hook functions                       |
+
+**Note** that in order to collect fees we will default `liquidity`, `amount0Min` and `amount1Min` to 0.
+Because fee collection can not be manipulated in a front-run attack, it is safe to set the slippage
+values `amount0Min, amount1Min` to `0`.
+
+```solidity
+/// @dev collecting fees is achieved with liquidity=0, the second parameter
+params[0] = abi.encode(tokenId, 0, 0, 0, hookData);
+```
+
+The `TAKE_PAIR` action requires the following parameters:
+
+* `currency0` - *Currency*, one of the tokens to be paid by msg.sender
+* `currency1` - *Currency*, the other token to be paid by msg.sender
+* `recipient` - *address*, destination of the fee revenue for both tokens
+
+```solidity
+Currency currency0 = Currency.wrap(<tokenAddress1>); // tokenAddress1 = 0 for native ETH
+Currency currency1 = Currency.wrap(<tokenAddress2>);
+params[1] = abi.encode(currency0, currency1, recipient);
+```
+
+## 4. Submit call
+The entrypoint for all liquidity operations is `modifyLiquidities()`.
+
+```solidity
+uint256 deadline = block.timestamp + 60;
+
+uint256 valueToPass = currency0.isAddressZero() ? amount0Max : 0;
+
+posm.modifyLiquidities{value: valueToPass}(
+    abi.encode(actions, params),
+    deadline
+);
+```
+
+## Additional Notes:
+* To obtain the amount of fees received, callers should read
+  token balances before and after the `.modifyLiquidities()` call.
+
+
+
+# Burn Position (/docs/protocols/v4/guides/managing-liquidity/burn-liquidity)
+
+Burn an existing Uniswap v4 liquidity position and withdraw underlying assets.
+
+## Context
+To liquidate a position, the *burn* functionality can be invoked.
+The funds in the position will be withdrawn and
+all the information of the underlying token will be cleared.
+Burning the position is a cost effective way to
+exit as a liquidity provider.
+
+## Setup
+See the [setup guide](/docs/protocols/v4/guides/managing-liquidity/getting-started)
+
+## Guide
+Below is a step-by-step guide to burn a position.
+
+## 1. Import and define IPositionManager
+```solidity
+import {IPositionManager} from "v4-periphery/src/interfaces/IPositionManager.sol";
+
+// inside a contract, test, or foundry script:
+IPositionManager posm = IPositionManager(<address>);
+```
+
+## 2. Encode actions
+To burn a position, two actions are required:
+
+* burn operation - clears position entirely, withdrawing funds
+* take pair - sends withdrawn funds to the recipient
+
+```solidity
+import {Actions} from "v4-periphery/src/libraries/Actions.sol";
+
+bytes memory actions = abi.encodePacked(uint8(Actions.BURN_POSITION), uint8(Actions.TAKE_PAIR));
+```
+
+## 3. Encode parameters
+```solidity
+bytes[] memory params = new bytes[](2);
+```
+
+The `BURN_POSITION` action requires the following parameters:
+
+| Parameter    | Type      | Description                                                                   |
+| ------------ | --------- | ----------------------------------------------------------------------------- |
+| `tokenId`    | *uint256* | position identifier                                                           |
+| `amount0Min` | *uint128* | the minimum amount of currency0 liquidity msg.sender is expecting to get back |
+| `amount1Min` | *uint128* | the minimum amount of currency1 liquidity msg.sender is expecting to get back |
+| `hookData`   | *bytes*   | arbitrary data that will be forwarded to hook functions                       |
+
+```solidity
+params[0] = abi.encode(tokenId, amount0Min, amount1Min, hookData);
+```
+
+The `TAKE_PAIR` action requires the following parameters:
+
+| Parameter   | Type       | Description                          |
+| ----------- | ---------- | ------------------------------------ |
+| `currency0` | *Currency* | first token currency                 |
+| `currency1` | *Currency* | second token currency                |
+| `recipient` | *address*  | address that will receive the tokens |
+
+```solidity
+params[1] = abi.encode(currency0, currency1, recipient);
+```
+
+## 4. Submit call
+The entrypoint for all liquidity operations is `modifyLiquidities()`
+
+```solidity
+uint256 deadline = block.timestamp + 60;
+
+posm.modifyLiquidities(
+    abi.encode(actions, params),
+    deadline
+);
+```
+
+(
+ Below code is from code.
+
+ import { usePublicClient } from 'wagmi';
+import { keccak256, encodeAbiParameters } from 'viem';
+import { getSqrtRatioAtTick, LiquidityAmounts } from './math';
+
+const STATE_VIEW_ABI = [
+  {
+    type: 'function',
+    name: 'getSlot0',
+    inputs: [{ name: 'poolId', type: 'bytes32' }],
+    outputs: [
+      { name: 'sqrtPriceX96', type: 'uint160' },
+      { name: 'tick', type: 'int24' },
+      { name: 'protocolFee', type: 'uint24' },
+      { name: 'lpFee', type: 'uint24' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getPositionInfo',
+    inputs: [
+      { name: 'poolId', type: 'bytes32' },
+      { name: 'owner', type: 'address' },
+      { name: 'tickLower', type: 'int24' },
+      { name: 'tickUpper', type: 'int24' },
+      { name: 'salt', type: 'bytes32' },
+    ],
+    outputs: [
+      { name: 'liquidity', type: 'uint128' },
+      { name: 'feeGrowthInside0LastX128', type: 'uint256' },
+      { name: 'feeGrowthInside1LastX128', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getFeeGrowthInside',
+    inputs: [
+      { name: 'poolId', type: 'bytes32' },
+      { name: 'tickLower', type: 'int24' },
+      { name: 'tickUpper', type: 'int24' },
+    ],
+    outputs: [
+      { name: 'feeGrowthInside0X128', type: 'uint256' },
+      { name: 'feeGrowthInside1X128', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+  },
+] as const;
+
+interface PoolKey {
+  currency0: `0x${string}`;
+  currency1: `0x${string}`;
+  fee: number;
+  tickSpacing: number;
+  hooks: `0x${string}`;
+}
+
+interface PositionData {
+  // raw liquidity
+  liquidity: bigint;
+
+  // liquidity broken down into token amounts
+  amount0: bigint;
+  amount1: bigint;
+  amount0Human: number;
+  amount1Human: number;
+
+  // unclaimed fees (raw)
+  fees0: bigint;
+  fees1: bigint;
+  fees0Human: number;
+  fees1Human: number;
+}
+
+const computePoolId = (poolKey: PoolKey): `0x${string}` => {
+  return keccak256(
+    encodeAbiParameters(
+      [
+        {
+          type: 'tuple',
+          components: [
+            { name: 'currency0', type: 'address' },
+            { name: 'currency1', type: 'address' },
+            { name: 'fee', type: 'uint24' },
+            { name: 'tickSpacing', type: 'int24' },
+            { name: 'hooks', type: 'address' },
+          ],
+        },
+      ],
+      [poolKey]
+    )
+  );
+};
+
+export const usePositionData = () => {
+  const publicClient = usePublicClient();
+
+  const getPositionData = async (
+    tokenId: bigint,
+    poolKey: PoolKey,
+    tickLower: number,
+    tickUpper: number,
+    decimals0: number,
+    decimals1: number,
+  ): Promise<PositionData> => {
+    const poolId = computePoolId(poolKey);
+    const salt = `0x${tokenId.toString(16).padStart(64, '0')}` as `0x${string}`;
+
+    // fetch everything in parallel
+    const [slot0, positionInfo, feeGrowthInside] = await Promise.all([
+      publicClient.readContract({
+        address: STATE_VIEW_ADDRESS as `0x${string}`,
+        abi: STATE_VIEW_ABI,
+        functionName: 'getSlot0',
+        args: [poolId],
+      }),
+      publicClient.readContract({
+        address: STATE_VIEW_ADDRESS as `0x${string}`,
+        abi: STATE_VIEW_ABI,
+        functionName: 'getPositionInfo',
+        args: [poolId, POSITION_MANAGER_ADDRESS as `0x${string}`, tickLower, tickUpper, salt],
+      }),
+      publicClient.readContract({
+        address: STATE_VIEW_ADDRESS as `0x${string}`,
+        abi: STATE_VIEW_ABI,
+        functionName: 'getFeeGrowthInside',
+        args: [poolId, tickLower, tickUpper],
+      }),
+    ]);
+
+    const { sqrtPriceX96 } = slot0;
+    const { liquidity, feeGrowthInside0LastX128, feeGrowthInside1LastX128 } = positionInfo;
+    const { feeGrowthInside0X128, feeGrowthInside1X128 } = feeGrowthInside;
+
+    // 1. Liquidity broken into token amounts
+    const sqrtPriceLowerX96 = getSqrtRatioAtTick(tickLower);
+    const sqrtPriceUpperX96 = getSqrtRatioAtTick(tickUpper);
+
+    const [amount0, amount1] = LiquidityAmounts.getAmountsForLiquidity(
+      sqrtPriceX96,
+      sqrtPriceLowerX96,
+      sqrtPriceUpperX96,
+      liquidity,
+    );
+
+    // 2. Unclaimed fees
+    const Q128 = 2n ** 128n;
+    const feeGrowthDelta0 = (feeGrowthInside0X128 - feeGrowthInside0LastX128 + Q128) % Q128;
+    const feeGrowthDelta1 = (feeGrowthInside1X128 - feeGrowthInside1LastX128 + Q128) % Q128;
+
+    const fees0 = (liquidity * feeGrowthDelta0) / Q128;
+    const fees1 = (liquidity * feeGrowthDelta1) / Q128;
+
+    return {
+      liquidity,
+
+      amount0,
+      amount1,
+      amount0Human: Number(amount0) / 10 ** decimals0,
+      amount1Human: Number(amount1) / 10 ** decimals1,
+
+      fees0,
+      fees1,
+      fees0Human: Number(fees0) / 10 ** decimals0,
+      fees1Human: Number(fees1) / 10 ** decimals1,
+    };
+  };
+
+  return { getPositionData };
+};
+)
+
+
+
+schema.graphql
+type PoolManager @entity(immutable: false) {
+  # poolManager address
+  id: ID!
+  # amount of pools created
+  poolCount: BigInt!
+  # amoutn of transactions all time
+  txCount: BigInt!
+  # total volume all time in derived USD
+  totalVolumeUSD: BigDecimal!
+  # total swap fees all time in USD
+  totalFeesUSD: BigDecimal!
+  # TVL derived in USD
+  totalValueLockedUSD: BigDecimal!
+  # current owner of the factory
+  owner: ID!
+}
+
+
+type Token @entity(immutable: false) {
+  # token address
+  id: ID!
+  # token symbol
+  symbol: String!
+  # token name
+  name: String!
+  # token decimals
+  decimals: BigInt!
+  # token total supply
+  totalSupply: BigInt!
+  # volume in token units
+  volume: BigDecimal!
+  # volume in derived USD
+  volumeUSD: BigDecimal!
+  # fees in USD
+  feesUSD: BigDecimal!
+  # transactions across all pools that include this token
+  txCount: BigInt!
+  # number of pools containing this token
+  poolCount: BigInt!
+  # liquidity across all pools in token units
+  totalValueLocked: BigDecimal!
+  # liquidity across all pools in derived USD
+  totalValueLockedUSD: BigDecimal!
+  # Note: for chains where ETH is not the native token, this will be the derived
+  # price of that chain's native token, effectively, this should be renamed
+  # derivedNative
+  derivedUSDC: BigDecimal!
+  # pools token is in that are white listed for USD pricing
+  whitelistPools: [Pool!]!
+  # derived fields
+  tokenDayData: [TokenDayData!]! @derivedFrom(field: "token")
+}
+
+type Pool @entity(immutable: false) {
+  # pool address
+  id: ID!
+  # creation
+  createdAtTimestamp: BigInt!
+  # block pool was created at
+  createdAtBlockNumber: BigInt!
+  # token0
+  token0: Token!
+  # token1
+  token1: Token!
+  # fee amount
+  feeTier: BigInt!
+  # in range liquidity
+  liquidity: BigInt!
+  # current price tracker
+  sqrtPrice: BigInt!
+  # token0 per token1
+  token0Price: BigDecimal!
+  # token1 per token0
+  token1Price: BigDecimal!
+  # current tick
+  tick: BigInt
+  # tick spacing
+  tickSpacing: BigInt!
+  # current observation index
+  observationIndex: BigInt!
+  # all time token0 swapped
+  volumeToken0: BigDecimal!
+  # all time token1 swapped
+  volumeToken1: BigDecimal!
+  # all time USD swapped
+  volumeUSD: BigDecimal!
+  # fees in USD
+  feesUSD: BigDecimal!
+  # all time number of transactions
+  txCount: BigInt!
+  # all time fees collected token0
+  collectedFeesToken0: BigDecimal!
+  # all time fees collected token1
+  collectedFeesToken1: BigDecimal!
+  # all time fees collected derived USD
+  collectedFeesUSD: BigDecimal!
+  # total token 0 across all ticks
+  totalValueLockedToken0: BigDecimal!
+  # total token 1 across all ticks
+  totalValueLockedToken1: BigDecimal!
+  # tvl USD
+  totalValueLockedUSD: BigDecimal!
+  # true when TVL is sourced from an external hook rather than derived pricing
+  isExternalLiquidity: Boolean!
+  # Fields used to help derived relationship
+  liquidityProviderCount: BigInt! # used to detect new exchanges
+  # hourly snapshots of pool data
+  poolHourData: [PoolHourData!]! @derivedFrom(field: "pool")
+  # daily snapshots of pool data
+  poolDayData: [PoolDayData!]! @derivedFrom(field: "pool")
+  # hooks address
+  hooks: String!
+  # derived fields
+  modifyLiquiditys: [ModifyLiquidity!]! @derivedFrom(field: "pool")
+  swaps: [Swap!]! @derivedFrom(field: "pool")
+  ticks: [Tick!]! @derivedFrom(field: "pool")
+}
+
+type Tick @entity(immutable: false) {
+  # format: <pool address>#<tick index>
+  id: ID!
+  # pool address
+  poolAddress: String
+  # tick index
+  tickIdx: BigInt!
+  # pointer to pool
+  pool: Pool!
+  # total liquidity pool has as tick lower or upper
+  liquidityGross: BigInt!
+  # how much liquidity changes when tick crossed
+  liquidityNet: BigInt!
+  # calculated price of token0 of tick within this pool - constant
+  price0: BigDecimal!
+  # calculated price of token1 of tick within this pool - constant
+  price1: BigDecimal!
+  # created time
+  createdAtTimestamp: BigInt!
+  # created block
+  createdAtBlockNumber: BigInt!
+}
+
+type Transaction @entity(immutable: true) {
+  # txn hash
+  id: ID!
+  # block txn was included in
+  blockNumber: BigInt!
+  # timestamp txn was confirmed
+  timestamp: BigInt!
+  # gas used during txn execution
+  gasUsed: BigInt!
+  gasPrice: BigInt!
+  # derived values
+  modifyLiquiditys: [ModifyLiquidity]! @derivedFrom(field: "transaction")
+  swaps: [Swap]! @derivedFrom(field: "transaction")
+  transfers: [Transfer]! @derivedFrom(field: "transaction")
+  subscriptions: [Subscribe]! @derivedFrom(field: "transaction")
+  unsubscriptions: [Unsubscribe]! @derivedFrom(field: "transaction")
+}
+
+type Swap @entity(immutable: true) {
+  # transaction hash + "#" + index in swaps Transaction array
+  id: ID!
+  # pointer to transaction
+  transaction: Transaction!
+  # timestamp of transaction
+  timestamp: BigInt!
+  # pool swap occured within
+  pool: Pool!
+  # allow indexing by tokens
+  token0: Token!
+  # allow indexing by tokens
+  token1: Token!
+  # sender of the swap
+  sender: Bytes!
+  # recipient of the swap
+  # recipient: Bytes
+  # txn origin
+  origin: Bytes! # the EOA that initiated the txn
+  # delta of token0 swapped
+  amount0: BigDecimal!
+  # delta of token1 swapped
+  amount1: BigDecimal!
+  # derived info
+  amountUSD: BigDecimal!
+  # The sqrt(price) of the pool after the swap, as a Q64.96
+  sqrtPriceX96: BigInt!
+  # the tick after the swap
+  tick: BigInt!
+  # index within the txn
+  logIndex: BigInt
+}
+
+type ModifyLiquidity @entity(immutable: true) {
+  # transaction hash + "#" + index in mints Transaction array
+  id: ID!
+  # which txn the ModifyLiquidity was included in
+  transaction: Transaction!
+  # time of txn
+  timestamp: BigInt!
+  # pool position is within
+  pool: Pool!
+  # allow indexing by tokens
+  token0: Token!
+  # allow indexing by tokens
+  token1: Token!
+  # owner of position where liquidity modified to
+  # owner: Bytes
+  # the address that modified the liquidity
+  sender: Bytes
+  # txn origin
+  origin: Bytes! # the EOA that initiated the txn
+  # amount of liquidity modified
+  amount: BigInt!
+  # amount of token 0 modified
+  amount0: BigDecimal!
+  # amount of token 1 modified
+  amount1: BigDecimal!
+  # derived amount based on available prices of tokens
+  amountUSD: BigDecimal
+  # lower tick of the position
+  tickLower: BigInt!
+  # upper tick of the position
+  tickUpper: BigInt!
+  # index within the txn
+  logIndex: BigInt
+}
+
+# Data accumulated and condensed into day stats for all of Uniswap
+type UniswapDayData @entity(immutable: false) {
+  # timestamp rounded to current day by dividing by 86400
+  id: ID!
+  # timestamp rounded to current day by dividing by 86400
+  date: Int!
+  # total daily volume in Uniswap derived in terms of USD
+  volumeUSD: BigDecimal!
+  # fees in USD
+  feesUSD: BigDecimal!
+  # number of daily transactions
+  txCount: BigInt!
+  # tvl in terms of USD
+  tvlUSD: BigDecimal!
+}
+
+# Data accumulated and condensed into day stats for each pool
+type PoolDayData @entity(immutable: false) {
+  # timestamp rounded to current day by dividing by 86400
+  id: ID!
+  # timestamp rounded to current day by dividing by 86400
+  date: Int!
+  # pointer to pool
+  pool: Pool!
+  # in range liquidity at end of period
+  liquidity: BigInt!
+  # current price tracker at end of period
+  sqrtPrice: BigInt!
+  # price of token0 - derived from sqrtPrice
+  token0Price: BigDecimal!
+  # price of token1 - derived from sqrtPrice
+  token1Price: BigDecimal!
+  # current tick at end of period
+  tick: BigInt
+  # tvl derived in USD at end of period
+  tvlUSD: BigDecimal!
+  # volume in token0
+  volumeToken0: BigDecimal!
+  # volume in token1
+  volumeToken1: BigDecimal!
+  # volume in USD
+  volumeUSD: BigDecimal!
+  # fees in USD
+  feesUSD: BigDecimal!
+  # numebr of transactions during period
+  txCount: BigInt!
+  # opening price of token0
+  open: BigDecimal!
+  # high price of token0
+  high: BigDecimal!
+  # low price of token0
+  low: BigDecimal!
+  # close price of token0
+  close: BigDecimal!
+}
+
+# hourly stats tracker for pool
+type PoolHourData @entity(immutable: false) {
+  # format: <pool address>-<timestamp>
+  id: ID!
+  # unix timestamp for start of hour
+  periodStartUnix: Int!
+  # pointer to pool
+  pool: Pool!
+  # in range liquidity at end of period
+  liquidity: BigInt!
+  # current price tracker at end of period
+  sqrtPrice: BigInt!
+  # price of token0 - derived from sqrtPrice
+  token0Price: BigDecimal!
+  # price of token1 - derived from sqrtPrice
+  token1Price: BigDecimal!
+  # current tick at end of period
+  tick: BigInt
+  # tvl derived in USD at end of period
+  tvlUSD: BigDecimal!
+  # volume in token0
+  volumeToken0: BigDecimal!
+  # volume in token1
+  volumeToken1: BigDecimal!
+  # volume in USD
+  volumeUSD: BigDecimal!
+  # fees in USD
+  feesUSD: BigDecimal!
+  # numebr of transactions during period
+  txCount: BigInt!
+  # opening price of token0
+  open: BigDecimal!
+  # high price of token0
+  high: BigDecimal!
+  # low price of token0
+  low: BigDecimal!
+  # close price of token0
+  close: BigDecimal!
+}
+
+type TokenDayData @entity(immutable: false) {
+  # token address concatendated with date
+  id: ID!
+  # timestamp rounded to current day by dividing by 86400
+  date: Int!
+  # pointer to token
+  token: Token!
+  # volume in token units
+  volume: BigDecimal!
+  # volume in derived USD
+  volumeUSD: BigDecimal!
+  # liquidity across all pools in token units
+  totalValueLocked: BigDecimal!
+  # liquidity across all pools in derived USD
+  totalValueLockedUSD: BigDecimal!
+  # price at end of period in USD
+  priceUSD: BigDecimal!
+  # fees in USD
+  feesUSD: BigDecimal!
+  # opening price USD
+  open: BigDecimal!
+  # high price USD
+  high: BigDecimal!
+  # low price USD
+  low: BigDecimal!
+  # close price USD
+  close: BigDecimal!
+}
+
+type TokenHourData @entity(immutable: false) {
+  # token address concatendated with date
+  id: ID!
+  # unix timestamp for start of hour
+  periodStartUnix: Int!
+  # pointer to token
+  token: Token!
+  # volume in token units
+  volume: BigDecimal!
+  # volume in derived USD
+  volumeUSD: BigDecimal!
+  # liquidity across all pools in token units
+  totalValueLocked: BigDecimal!
+  # liquidity across all pools in derived USD
+  totalValueLockedUSD: BigDecimal!
+  # price at end of period in USD
+  priceUSD: BigDecimal!
+  # fees in USD
+  feesUSD: BigDecimal!
+  # opening price USD
+  open: BigDecimal!
+  # high price USD
+  high: BigDecimal!
+  # low price USD
+  low: BigDecimal!
+  # close price USD
+  close: BigDecimal!
+}
+
+type Position @entity(immutable: false) {
+  # tokenId
+  id: ID!
+  # tokenId
+  tokenId: BigInt!
+  # address of current owner
+  owner: String!
+  # the EOA that minted the position
+  origin: String!
+  # created time
+  createdAtTimestamp: BigInt!
+  # subscribe events
+  subscriptions: [Subscribe!]! @derivedFrom(field: "position")
+  # unsubscription events
+  unsubscriptions: [Unsubscribe!]! @derivedFrom(field: "position")
+  # transfer events
+  transfers: [Transfer!]! @derivedFrom(field: "position")
+}
+
+type Subscribe @entity(immutable: true) {
+  # transaction hash + '-' + log index
+  id: ID!
+  # token id of position subscribed to
+  tokenId: BigInt!
+  # address of subscriber
+  address: String!
+  # pointer to transaction
+  transaction: Transaction!
+  # log index
+  logIndex: BigInt!
+  # time of tx
+  timestamp: BigInt!
+  # the EOA that initiated the tx
+  origin: String!
+  # pointer to position
+  position: Position!
+}
+
+type Unsubscribe @entity(immutable: true) {
+  # transaction hash + '-' + log index
+  id: ID!
+  # token id of position unsubscribed from
+  tokenId: BigInt!
+  # address of unsubscriber
+  address: String!
+  # pointer to transaction
+  transaction: Transaction!
+  # log index
+  logIndex: BigInt!
+  # time of tx
+  timestamp: BigInt!
+  # the EOA that initiated the tx
+  origin: String!
+  # pointer to position
+  position: Position!
+}
+
+type Transfer @entity(immutable: true) {
+  # transaction hash + '-' + log index
+  id: ID!
+  # token id of position
+  tokenId: BigInt!
+  # address of previous owner
+  from: String!
+  # address of new owner
+  to: String!
+  # pointer to transaction
+  transaction: Transaction!
+  # log index
+  logIndex: BigInt!
+  # time of tx
+  timestamp: BigInt!
+  # the EOA that initiated the tx
+  origin: String!
+  # pointer to position
+  position: Position!
+}
+
+type EulerSwapHook @entity(immutable: false) {
+  # Composite key = eulerAccount-asset0-asset1
+  id: ID!
+  # The latest hook address for this key
+  hook: String!
+  # address of the euler account
+  eulerAccount: String!
+  # address of asset0
+  asset0: String!
+  # address of asset1
+  asset1: String!
+}
+
+type ArrakisHook @entity(immutable: false) {
+  # hook address
+  id: ID!
+  # module address that created this hook
+  module: Bytes!
+  # salt used in creation
+  salt: Bytes!
+  # timestamp of creation
+  createdAtTimestamp: BigInt!
+  # block number of creation
+  createdAtBlockNumber: BigInt!
+}
+
+
+
+  /* Font size scale — bumped up ~1-2px across the board */
+  --text-xs: 0.8125rem;   /* 13px (was 12px) */
+  --text-sm: 0.9375rem;   /* 15px (was 14px) */
+  --text-base: 1.0625rem; /* 17px (was 16px) */
+  --text-lg: 1.1875rem;   /* 19px (was 18px) */
+  --text-xl: 1.375rem;    /* 22px (was 20px) */
+  --text-2xl: 1.625rem;   /* 26px (was 24px) */
+  --text-3xl: 2rem;       /* 32px (was 30px) */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  const [{ request, result }, gas, gasPrice] = await Promise.all([
+  publicClient.simulateContract({
+    address: contractAddress,
+    abi,
+    functionName: "myFunction",
+    args: [arg1, arg2],
+    account,
+  }),
+  publicClient.estimateContractGas({
+    address: contractAddress,
+    abi,
+    functionName: "myFunction",
+    args: [arg1, arg2],
+    account,
+  }),
+  publicClient.getGasPrice(),
+]);
+
+console.log("Estimated fee:", formatEther(gas * gasPrice));
+
+const hash = await walletClient.writeContract({ ...request, gas });
+const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+
+
+
+
+// lets build the frontend for our campaign.
+Add a menu item in the navbar called campaigns, once clicked takes u to /campaigns, once clicked this lists all available campaigns, whether active or not and other info like address, name and description. 
+Just extend HookConfig[] type in config/hooksDetail.ts and include active and poolkey.
+
+poolkeys of our pools with pointshook attached are:
+///////////////////////////////////////
+
+
+
+
+/////////////////////////////////////
+
+
+
+export interface HookConfig {
+  address: `0x${string}`;
+  name: string;
+  description: string;
+  rewardType: string;
+}
+
+
+export interface PoolKey {
+  currency0: `0x${string}`;
+  currency1: `0x${string}`;
+  fee: number;
+  tickSpacing: number;
+  hooks: `0x${string}`;
+}
+
+
+export interface HookCampaign extends HookConfig {
+  active: boolean;
+  poolKeys: PoolKey[];
+
+
+}
+
+
+
+export const campaigns: HookCampaign[] = [
+  // we have just one campaign for now
+  // campaign name - PointsHook
+  {
+    active: true,
+    address: "0xd523232b30b61be4c74937be5313d2cbd1748040" as `0x${string}`,
+    name: "PointsHook",
+    description: "Swap & Accumulate Points.\n\nEvery swap you make in this pool earns you Points equivalent to 1% of your swap volume! Points are unique to this specific pool and are minted directly to your wallet as collectible ERC1155 tokens. Use them to track your rank and unlock future reward campaigns.",
+    rewardType: "ERC-1155 Tokens",
+
+    poolKeys: [
+      // mUSDC/MONKE (find addresses in config/tokens.ts and replace)
+      {
+      currency0: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+      currency1: "0x3600000000000000000000000000000000000000" as `0x${string}`,
+      fee: 3000,
+      tickSpacing: 60,
+      hooks: "0xd523232b30b61be4c74937be5313d2cbd1748040" as `0x${string}`,
+    },
+    currency0: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+    // RCH/mUSDC
+    {
+      currency1: "0x3600000000000000000000000000000000000000" as `0x${string}`,
+      fee: 3000,
+      tickSpacing: 60,
+      hooks: "0xd523232b30b61be4c74937be5313d2cbd1748040" as `0x${string}`,
+    },
+    //mUSDC/SOFT
+    {
+      currency0: "0x0000000000000000000000000000000000000000" as `0x${string}`,
+      currency1: "0x3600000000000000000000000000000000000000" as `0x${string}`,
+      fee: 3000,
+      tickSpacing: 60,
+      hooks: "0xd523232b30b61be4c74937be5313d2cbd1748040" as `0x${string}`,
+    }
+    ],
+  }
+];
+
+
+\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
+
+Each campaign has its own page, once clicked goes to its page (/campaigns/[id]).
+it will display all info about the campaign like the pools that has the pointsHook attached to them and leaderboard.
+There should be leaderboard for each poolid, the data we fetch from the indexer has tokenId which is equal to poolid (uint256(poolid), we convert poolkey to poolid using 
+
+    const encodedPoolKey = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["address", "address", "uint24", "int24", "address"],
+        [poolKey.currency0, poolKey.currency1, poolKey.fee, poolKey.tickSpacing, poolKey.hooks]
+    );
+
+    // 4. Hash to get the PoolId
+    const poolId = ethers.keccak256(encodedPoolKey);
+    
+)
+show user position in each of the leaderboard by checking against their connected address.show other users position based on their points. (tokenid, address, amount). include pagination also. make it display how long each user has been in the leaderboard. using the timestamp in the indexer data.
+In the same page, display latest transactions that mint the reward token for that campaign.
+
+use the details to fetch the pool tokens images and symbols and whatever, i think u can use the tokenAddress/currency to match and get the token image from config/tokens.ts
+
+
+
+in the frontend, if e.g we have
+
+const rawPoints = 1024198841836855728n
+const displayPoints = Number(formatUnits(rawPoints, 15)).toFixed(3)
+// "1024.199"
+
+so points wont be too big for user to see

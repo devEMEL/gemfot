@@ -1,0 +1,110 @@
+{
+  poolManagers(first: 1) {
+    id
+    poolCount
+    txCount
+    totalVolumeUSD
+    totalFeesUSD
+    totalValueLockedUSD
+    owner
+  }
+
+  tokens(first: 100, skip: 0, orderBy: totalValueLockedUSD, orderDirection: desc) {
+    id
+    symbol
+    name
+    decimals
+    totalSupply
+    volumeUSD
+    feesUSD
+    txCount
+    poolCount
+    totalValueLocked
+    totalValueLockedUSD
+  }
+  pools(first: 1000, skip: 0, orderBy: createdAtTimestamp, orderDirection: desc) {
+    id
+    createdAtTimestamp
+    token0 {
+      id
+      symbol
+      name
+      decimals
+    }
+    token1 {
+      id
+      symbol
+      name
+      decimals
+    }
+    feeTier
+    liquidity
+    sqrtPrice
+    token0Price
+    token1Price
+    tick
+    tickSpacing
+    volumeUSD
+    feesUSD
+    txCount
+    totalValueLockedToken0
+    totalValueLockedToken1
+    totalValueLockedUSD
+    hooks
+    poolDayData(first: 1, orderBy: date, orderDirection: desc) {
+      date
+      volumeUSD
+      feesUSD
+    }
+  }
+  
+  query {
+  tokenDayDatas(
+    where: { 
+      token: "<TOKEN_ID>", 
+      date_gte: <START_OF_TODAY_TIMESTAMP> # e.g., Math.floor(Date.now() / 86400000) * 86400
+    }
+  ) {
+    feesUSD
+  }
+}
+
+
+  swaps(first: 100, skip: 0, orderBy: timestamp, orderDirection: desc) {
+    id
+    timestamp
+    pool {
+      id
+    }
+    token0 {
+      id
+      symbol
+    }
+    token1 {
+      id
+      symbol
+    }
+    sender
+    origin
+    amount0
+    amount1
+    amountUSD
+    sqrtPriceX96
+    tick
+  }
+  positions(first: 100) {
+    id
+    tokenId
+    owner
+    origin
+    createdAtTimestamp
+  }
+  uniswapDayDatas(first: 30, orderBy: date, orderDirection: desc) {
+    id
+    date
+    volumeUSD
+    feesUSD
+    txCount
+    tvlUSD
+  }
+}

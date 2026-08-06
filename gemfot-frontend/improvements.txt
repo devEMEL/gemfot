@@ -1,0 +1,89 @@
+Question:
+if thats the case i cant use alchemy free since it has 25 requests/seconds
+
+
+Answer:
+Not necessarily. The important point is that **Alchemy's 25 requests/second limit is shared across all users of your app**, but most users are not generating requests continuously.
+
+Let's estimate.
+
+Suppose one amount change results in:
+
+* 1 quote
+* 2 balance reads
+* 1 gas price read
+
+≈ **4 requests**
+
+If a user types:
+
+```
+1
+10
+100
+```
+
+that's 3 quote cycles:
+
+```
+3 × 4 = 12 requests
+```
+
+Still below **25 requests/second** for a single user, especially since you already have a **300 ms debounce**.
+
+### When would you hit the limit?
+
+The limit becomes a concern when **many users are active at the same time**.
+
+For example:
+
+* 5 users each generating ~5 requests/second = **25 requests/second**.
+* 20 users typing simultaneously could easily exceed it.
+
+So the free tier is mainly a constraint on **concurrent traffic**, not on one person using the app.
+
+### Ways to reduce request count
+
+You can optimize further:
+
+* **Don't fetch `eth_gasPrice`** on every keystroke. Fetch it every 15–30 seconds or only when the user clicks "Swap".
+* **Don't refetch balances** while typing. A user's balance doesn't change because they entered another digit. Refresh balances only:
+
+  * when the wallet connects,
+  * after a successful swap,
+  * or when the user manually refreshes.
+* **Use multicall** to fetch both token balances in one RPC request.
+* **Increase the debounce** to 500–700 ms if you don't need quotes to update instantly.
+
+With those optimizations, typing could go from roughly:
+
+```
+Quote
+Balance A
+Balance B
+Gas price
+```
+
+(4 requests)
+
+to simply:
+
+```
+Quote
+```
+
+(1 request)
+
+while typing.
+
+### My recommendation
+
+For an MVP or early-stage DEX, **Alchemy's free tier is usually enough**. Many production dApps start there.
+
+As your user base grows, you can:
+
+* upgrade to a paid Alchemy plan,
+* use multiple RPC providers (Alchemy + another provider) with failover or load balancing,
+* or self-host/archive an RPC if needed.
+
+One question: **Which chain is MLSwap deployed on now?** (You previously mentioned ARC.) The answer matters because some ecosystems provide public RPC endpoints that can be used alongside Alchemy to spread the load.

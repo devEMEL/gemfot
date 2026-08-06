@@ -431,6 +431,155 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
     }
 
     /**
+     * [FL] Prevent liquidity modification during FairLaunch period
+     * [FD] Before a liquidity position is modified, we distribute fees before they can
+     * come in to take a share of fees that they have not earned.
+     *
+     * @param _key The key for the pool
+     *
+     * @return selector_ The function selector for the hook
+     */
+    function _beforeAddLiquidity(
+        address _sender,
+        PoolKey calldata _key,
+        ModifyLiquidityParams calldata,
+        bytes calldata
+    ) internal view override returns (
+        bytes4 selector_
+    ) {
+        // [FL] If in fair launch window, we need to prevent liquidity being added
+        _canModifyLiquidity(_key.toId(), _sender);
+
+        selector_ = IHooks.beforeAddLiquidity.selector;
+    }
+
+
+    /**
+     * Once a liquidity has been added, we emit our price update event.
+     *
+     * @param _sender The initial msg.sender for the add liquidity call
+     * @param _key The key for the pool
+     * @param _delta The caller's balance delta after adding liquidity; the sum of principal delta, fees accrued, and hook delta
+     * @param _feesAccrued The fees accrued since the last time fees were collected from this position
+     *
+     * @return selector_ The function selector for the hook
+     * @return BalanceDelta The hook's delta in token0 and token1. Positive: the hook is owed/took currency, negative: the hook owes/sent currency
+     */
+    function _afterAddLiquidity(
+        address _sender,
+        PoolKey calldata _key,
+        ModifyLiquidityParams calldata,
+        BalanceDelta _delta,
+        BalanceDelta _feesAccrued,
+        bytes calldata
+    ) internal override returns (
+        bytes4 selector_,
+        BalanceDelta
+    ) {
+        selector_ = IHooks.afterAddLiquidity.selector;
+
+        // Emit our pool state update to listeners
+        _emitPoolStateUpdate(_key.toId(), selector_, abi.encode(_sender, _delta, _feesAccrued));
+    }
+
+    /**
+     * [FL] Prevent liquidity modification during FairLaunch period
+     * [FD] Before liquidity is removed, we distribute fees.
+     *
+     * @param _key The key for the pool
+     *
+     * @return selector_ The function selector for the hook
+     */
+    function _beforeRemoveLiquidity(
+        address _sender,
+        PoolKey calldata _key,
+        ModifyLiquidityParams calldata,
+        bytes calldata
+    ) internal view override returns (
+        bytes4 selector_
+    ) {
+        // [FL] If in fair launch window, we need to prevent liquidity being removed
+        _canModifyLiquidity(_key.toId(), _sender);
+
+        // Set our return selector
+        selector_ = IHooks.beforeRemoveLiquidity.selector;
+    }
+
+    /**
+     * Once liquidity has been removed, we emit our price update event.
+     *
+     * @param _sender The initial msg.sender for the remove liquidity call
+     * @param _key The key for the pool
+     * @param _delta The caller's balance delta after removing liquidity; the sum of principal delta, fees accrued, and hook delta
+     * @param _feesAccrued The fees accrued since the last time fees were collected from this position
+     *
+     * @return selector_ The function selector for the hook
+     */
+    function _afterRemoveLiquidity(
+        address _sender,
+        PoolKey calldata _key,
+        ModifyLiquidityParams calldata,
+        BalanceDelta _delta,
+        BalanceDelta _feesAccrued,
+        bytes calldata
+    ) internal override returns (bytes4 selector_, BalanceDelta) {
+        selector_ = IHooks.afterRemoveLiquidity.selector;
+
+        // Emit our pool state update to listeners
+        _emitPoolStateUpdate(_key.toId(), selector_, abi.encode(_sender, _delta, _feesAccrued));
+    }
+
+    /**
+     * The hook called after donate, emitting our price update event.
+     *
+     * @param _sender The initial msg.sender for the donate call
+     * @param _key The key for the pool
+     * @param _amount0 The amount of token0 being donated
+     * @param _amount1 The amount of token1 being donated
+     *
+     * @return selector_ The function selector for the hook
+     */
+    function _afterDonate(
+        address _sender,
+        PoolKey calldata _key,
+        uint _amount0,
+        uint _amount1,
+        bytes calldata
+    ) internal override returns (bytes4 selector_) {
+        selector_ = IHooks.afterDonate.selector;
+
+        // Emit our pool state update to listeners
+        _emitPoolStateUpdate(_key.toId(), selector_, abi.encode(_sender, _amount0, _amount1));
+    }
+
+
+
+
+        /**
+     * If in fair launch window, we need to prevent liquidity being added. We can, however, modify
+     * liquidity if we are making the call from the BidWall or FairLaunch contracts.
+     *
+     * @param _poolId The PoolId having the liquidity modified
+     * @param _sender The address that is trying to modify liquidity
+     */
+    function _canModifyLiquidity(PoolId _poolId, address _sender) internal view {
+        // Check our valid addresses
+        if (_sender == address(bidWall) || _sender == address(fairLaunch)) {
+            return;
+        }
+
+        // Check if we have exited the FairLaunch window
+        if (!fairLaunch.inFairLaunchWindow(_poolId)) {
+            return;
+        }
+
+        // All other scenarios will result in revert
+        revert FairLaunch.CannotModifyLiquidityDuringFairLaunch();
+    }
+
+
+
+    /**
      * The hook called before the state of a pool is initialized. Prevents external contracts
      * from initializing pools using our contract as a hook.
      *
@@ -921,6 +1070,19 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
 
         // Action our BidWall closure via the {PoolManager} unlock
         poolManager.unlock(abi.encode(_key));
+    }
+
+
+    /**
+     * This function should only be called by the `closeBidWall` function to unlock the {PoolManager}
+     * interactions for the `{BidWall}.closeBidWall` function.
+     *
+     * @param _data The encoded {PoolKey} for the `closeBidWall` request
+     *
+     * @return bytes Empty data; nothing will be returned
+     */
+    function _unlockCallback(bytes calldata _data) internal virtual returns (bytes memory) {
+        bidWall.closeBidWall(abi.decode(_data, (PoolKey)));
     }
 
 

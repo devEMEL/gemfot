@@ -1,0 +1,27 @@
+{
+    "name": "EURC",
+    "website": "",
+    "description": "",
+    "explorer": "",
+    "symbol": "EURC",
+    "type": "erc20",
+    "decimals": 6,
+    "links": [
+        {
+            "name": "github",
+            "url": ""
+        },
+        {
+            "name": "twitter",
+            "url": ""
+        },
+        {
+            "name": "reddit",
+            "url": ""
+        },
+        {
+            "name": "whitepaper",
+            "url": ""
+        }
+    ]
+}
