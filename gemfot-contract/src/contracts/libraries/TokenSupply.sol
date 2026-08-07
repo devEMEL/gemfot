@@ -8,3 +8,5 @@ library TokenSupply {
     uint public constant MIN_TOTAL_SUPPLY = 1e24; // 1 MILLION
     uint public constant MAX_TOTAL_SUPPLY = 1e29; // 100 BILLION
 }
+
+// not implemented yet

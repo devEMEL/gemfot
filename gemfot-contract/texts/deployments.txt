@@ -2,22 +2,24 @@ cat gemfot-contract/.env | tail -22
 # Left blank for a fresh deploy (deploy.sh exports each one as it goes).
 # Fill these in from the deploy.sh summary block before running ./script/verify.sh.
 
-INITIAL_PRICE="0xaEeD0a3fa4072309d43298b887a1A39aa9CC070e"                        # USDCMarketCappedPrice
-FEE_EXEMPTIONS="0xBc501fB24D104860A81F8b140807Ad71b3a172Ea"                       # FeeExemptions
-ACTION_MANAGER="0x873C117aDd0aa5A03771b8E631835d46b4bb3C6a"                       # TreasuryActionManager
-INDEXER="0x7336AE990Bc60264aa88A0B11E5a5b1978B80CD6"                              # IndexerSubscriber
-FEE_ESCROW="0xc1825a35a64403ecc99E96FDd755BA79E20D025F"                           # FeeEscrow
-FEE_ESCROW_REGISTRY="0x8bF0df33858DFd420aFb91B36D80215E7D3BF5F7"                  # FeeEscrowRegistry
-PROTOCOL_FEE_RECIPIENT="0x0eb175D987Ad3d9775c7507C0Ce8b34D2a0f54a3"               # ProtocolFeeRecipient
-FAIR_LAUNCH="0xDE612935787716E271a4b9f6f05a6B22b976ee11"                          # FairLaunch
-BID_WALL="0x5a9560747b1F8Fb2111654d4c1Fa217c7277b002"                             # BidWall
-MEMECOIN_IMPLEMENTATION="0xA885c8660520c62CA755918d5ee32eA8872f14de"              # Memecoin (implementation)
-MEMECOIN_TREASURY_IMPLEMENTATION="0xa85f4311d81efb5EFaA3Dd321DF34D8599b31262"     # MemecoinTreasury (implementation)
-GEMFOT_MANAGER="0xCa510bB4ae1e45Dcd4141b82b152C239282cAFDc"                       # GemFotManager (hook)
-LAUNCH="0xf77D6A335Cfcd2AE97bD605ECE54422622372826"                               # Launch
-NOTIFIER="0x21736318Fd5c4AB081DF8232a8439E6de65b669c"                             # Notifier (deployed by GemFotManager)
-PREVENT_NO_FAIR_LAUNCH="0x5b2d5633d19F41f17B66523Dc28fF40738f5d7DF"               # PreventNoFairLaunch
-POOL_SWAP="0x84ba46e373910C6b0d7115410D61b4C4493AA6B5"                            # PoolSwap
-BLANK_ACTION="0x15F0534516Ce7B7f1848DC18F92d806cce9B53c9"                         # BlankAction
-BURN_TOKENS_ACTION="0xf590D0d974815DfE2CfD60CA9A27b024B4db95eD"                   # BurnTokensAction
-BUY_BACK_ACTION="0xB319611b391a97A96E84744a792498A2A9617479"                      # BuyBackAction
+INITIAL_PRICE="0xDaba8860228AEdD61dE002468c780998EFb529b7"                        # USDCMarketCappedPrice
+FEE_EXEMPTIONS="0x486449a1cE2dcC0586964FdE55572569Ad0586AD"                       # FeeExemptions
+ACTION_MANAGER="0x0BBEfF719cB512cd75Ce72c7a6c81704bb9953cB"                       # TreasuryActionManager
+INDEXER="0x523f5440dD12373FA2a38098cCcDd1f505c8088E"                              # IndexerSubscriber
+FEE_ESCROW="0x4c0259c7F2A09c798596851fb89683c7Ce0eB4Fb"                           # FeeEscrow
+FEE_ESCROW_REGISTRY="0x2Ac8dD1AF7496533B97dFf122f20B39EB4570079"                  # FeeEscrowRegistry
+PROTOCOL_FEE_RECIPIENT="0xdA36b2BaB25037cEe596ec80bF97e562911a9906"               # ProtocolFeeRecipient
+FAIR_LAUNCH="0xFa557275F639580dD9E4cD158fC57C415374aBA1"                          # FairLaunch
+BID_WALL="0x4F9502d05f535bB9331C29c72217Fb2342422FeF"                             # BidWall
+MEMECOIN_IMPLEMENTATION="0x82b29D940b738530C35eb0c2ACfE32120d42d4AA"              # Memecoin (implementation)
+MEMECOIN_TREASURY_IMPLEMENTATION="0x317A76aeb795Ffcf39BAE14e52C316C1FF35C5fe"     # MemecoinTreasury (implementation)
+GEMFOT_MANAGER="0x1F1C1c6a7A463563064abA67CFA51d33B25e6FdC"                       # GemFotManager (hook)
+LAUNCH="0x172E3486247fa40aA383E2757C7308D1ea0722f4"                               # Launch
+NOTIFIER="0x365b58b99A9Ef9834f402805f2A543d0314a2B25"                             # Notifier (deployed by GemFotManager)
+PREVENT_NO_FAIR_LAUNCH="0x3fF77171BEAd5c4A4336314bB2e4D41B923435dd"               # PreventNoFairLaunch
+POOL_SWAP="0x32196597bd74E85E576F02FdE50fCEf30E17395b"                            # PoolSwap
+BLANK_ACTION="0x01e23cEE5D3b29FD4f87a01ac096A64CBFdbf28E"                         # BlankAction
+BURN_TOKENS_ACTION="0xA7077E74fE299d8E0d7735dac544cdC2dFdb3b76"                   # BurnTokensAction
+BUY_BACK_ACTION="0x9AfC13eA191484B59E147bEc6CBFb20200BB5e66"                      # BuyBackAction
+
+# Deployed at block 55670261 (GemFotManager hook) on arc_testnet.

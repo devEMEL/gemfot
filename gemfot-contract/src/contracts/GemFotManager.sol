@@ -759,32 +759,30 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
     /**
      * @notice Allows users to buy tokens directly from the fair launch bonding curve
      * @param _key The PoolKey for the token pool
-     * @param _tokensToBuy The exact amount of memecoins to buy
+     * @param _nativeIn The amount of native currency (USDC) being spent on the bonding curve
      */
     function buyFairLaunch(
         PoolKey calldata _key,
-        uint256 _tokensToBuy
+        uint256 _nativeIn
     ) external {
         PoolId poolId = _key.toId();
-        
+
         if (!fairLaunch.inFairLaunchWindow(poolId)) {
             revert FairLaunch.FairLaunchWindowHasClosed();
         }
 
         uint _launchesAt = launchesAt[poolId];
+        int premineAmount;
+        bool isCreatorPremine;
+
         if (_launchesAt != 0) {
-            int premineAmount = _tload(PoolId.unwrap(poolId));
+            premineAmount = _tload(PoolId.unwrap(poolId));
             address memecoinAddress = Currency.unwrap(_key.currency0) == nativeToken ? Currency.unwrap(_key.currency1) : Currency.unwrap(_key.currency0);
-            
-            bool isCreatorPremine = premineAmount > 0 
+
+            isCreatorPremine = premineAmount > 0
                 && msg.sender == IMemecoin(memecoinAddress).creator();
 
-            if (isCreatorPremine) {
-                require(_tokensToBuy <= uint256(premineAmount), "Exceeds premine allocation");
-                int newPremine = premineAmount - int256(_tokensToBuy);
-                emit PoolPremine(poolId, int256(_tokensToBuy));
-                assembly { tstore(poolId, newPremine) }
-            } else {
+            if (!isCreatorPremine) {
                 if (_launchesAt > block.timestamp) {
                     revert TokenNotLaunched(_launchesAt);
                 }
@@ -792,15 +790,26 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
             }
         }
 
-        // 1. Calculate native cost from the bonding curve
+        // 1. Sell tokens from the bonding curve for the USDC amount the buyer is depositing.
+        //    `fillFromPosition` takes the native (USDC) amount in and returns the memecoins out.
         (uint nativeIn, uint tokensOut, FairLaunch.FairLaunchInfo memory info) = fairLaunch.fillFromPosition(
             poolId,
-            int256(_tokensToBuy)
+            _nativeIn.toInt256()
         );
 
         if (tokensOut == 0) {
             revert("No tokens available");
         }
+
+        // 1a. The premine allocation is denominated in memecoins, so it can only be settled once
+        //     the curve has told us how many tokens this deposit actually buys.
+        if (isCreatorPremine) {
+            require(tokensOut <= uint256(premineAmount), "Exceeds premine allocation");
+            int newPremine = premineAmount - int256(tokensOut);
+            emit PoolPremine(poolId, int256(tokensOut));
+            assembly { tstore(poolId, newPremine) }
+        }
+
 
         // 2. Calculate swap fee
         uint24 baseSwapFee = getPoolFeeDistribution(poolId).swapFee;
