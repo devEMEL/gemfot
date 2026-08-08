@@ -8,9 +8,9 @@ dataSources:
     name: GemFotManager
     network: arc-testnet
     source:
-      address: "0xCa510bB4ae1e45Dcd4141b82b152C239282cAFDc"
+      address: "0x930304FdbAAdCd689B71B581c727e223cAA7afdC"
       abi: GemFotManager
-      startBlock: 55488155
+      startBlock: 55990736
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -44,9 +44,9 @@ dataSources:
     name: FairLaunch
     network: arc-testnet
     source:
-      address: "0xDE612935787716E271a4b9f6f05a6B22b976ee11"
+      address: "0xDc888959343e0341d423c6B509eB77a199B20b2f"
       abi: FairLaunch
-      startBlock: 55488155
+      startBlock: 55990152
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9

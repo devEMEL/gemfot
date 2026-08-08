@@ -9,6 +9,7 @@ const COLUMNS: { title: string; links: { label: string; to?: string; href?: stri
       { label: 'Explore launches', to: '/' },
       { label: 'Launch a token', to: '/launch' },
       { label: 'Portfolio', to: '/portfolio' },
+      { label: 'Faucet', href: 'https://app.mlswapx.xyz/faucet' },
       {
         label: 'Contracts',
         href: `${activeNetwork.explorerUrl}/address/${activeNetwork.contracts.gemfotManager}`,

@@ -59,6 +59,7 @@ export function useLaunches(options: { first?: number; pollMs?: number } = {}) {
             const meta = await fetchMeta(l.tokenUri);
             return {
               ...l,
+              creator: typeof l.creator === 'string' ? l.creator : l.creator?.id ?? '',
               imageUrl: ipfsToHttp(meta.image),
               description: meta.description ?? '',
               isLive: !l.fairLaunchClosed && now < Number(l.fairLaunchEndsAt),

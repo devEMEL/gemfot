@@ -18,6 +18,7 @@ import {StoreKeys} from "@gemfot/types/StoreKeys.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeTransferLib} from "@solady/utils/SafeTransferLib.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import {IUnlockCallback} from "@uniswap/v4-core/src/interfaces/callback/IUnlockCallback.sol";
 import {Hooks, IHooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {SafeCast} from "@uniswap/v4-core/src/libraries/SafeCast.sol";
 import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
@@ -48,7 +49,7 @@ import {LinearBondingCurve} from "@gemfot/libraries/LinearBondingCurve.sol";
  * within comments using square brackets where possible.
  */
 
-contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys {
+contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys, IUnlockCallback {
     using BeforeSwapDeltaLibrary for BeforeSwapDelta;
     using CurrencySettler for Currency;
     using PoolIdLibrary for PoolKey;
@@ -58,10 +59,12 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
     using SafeTransferLib for address;
 
     error CallerIsNotBidWall();
+    error CallerIsNotPoolManager();
     error CannotBeInitializedDirectly();
     error InsufficientLaunchFee(uint _paid, uint _required);
     error TokenNotLaunched(uint _launchesAt);
     error UnknownPool(PoolId _poolId);
+    error UnknownUnlockAction();
 
 
     /// Emitted when a Launch pool is created
@@ -847,8 +850,22 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
 
     /**
      * @notice Allows closing a fair launch position (when sold out or expired) and initializing the pool.
+     *
+     * The closure seeds the pool with single-sided liquidity via `FairLaunch.closePosition`, which
+     * requires the {PoolManager} to be unlocked. This call therefore routes through
+     * `IPoolManager.unlock`, dispatching to `_closeExpiredFairLaunch` in `unlockCallback`.
      */
     function closeExpiredFairLaunch(PoolKey calldata _key) public {
+        poolManager.unlock(abi.encode(_CLOSE_FAIR_LAUNCH, _key));
+    }
+
+    /**
+     * Actions the fair launch closure for a pool. Only callable from within the {PoolManager}
+     * unlock callback, as it seeds the pool with single-sided liquidity.
+     *
+     * @param _key The {PoolKey} of the fair launch pool being closed
+     */
+    function _closeExpiredFairLaunch(PoolKey memory _key) internal {
         PoolId poolId = _key.toId();
         FairLaunch.FairLaunchInfo memory info = fairLaunch.fairLaunchInfo(poolId);
         
@@ -1063,6 +1080,13 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
     }
 
     /**
+     * Discriminator bytes used to route {PoolManager} unlock callbacks between BidWall closure
+     * and fair launch closure. These are private to the {GemFotManager}.
+     */
+    bytes1 private constant _CLOSE_BIDWALL = 0x01;
+    bytes1 private constant _CLOSE_FAIR_LAUNCH = 0x02;
+
+    /**
      * Calls for the BidWall to be closed, as this requires callback from the {PoolManager}.
      */
     function closeBidWall(
@@ -1083,20 +1107,34 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
         }
 
         // Action our BidWall closure via the {PoolManager} unlock
-        poolManager.unlock(abi.encode(_key));
+        poolManager.unlock(abi.encode(_CLOSE_BIDWALL, _key));
     }
 
-
     /**
-     * This function should only be called by the `closeBidWall` function to unlock the {PoolManager}
-     * interactions for the `{BidWall}.closeBidWall` function.
+     * Called back by the {PoolManager} while it is unlocked, routing between the BidWall and
+     * fair launch closures. See `closeBidWall` and `closeExpiredFairLaunch`.
      *
-     * @param _data The encoded {PoolKey} for the `closeBidWall` request
+     * @param _data The encoded action discriminator and {PoolKey} for the closure request
      *
-     * @return bytes Empty data; nothing will be returned
+     * @return result Empty data; nothing will be returned
      */
-    function _unlockCallback(bytes calldata _data) internal virtual returns (bytes memory) {
-        bidWall.closeBidWall(abi.decode(_data, (PoolKey)));
+    function unlockCallback(
+        bytes calldata _data
+    ) external returns (bytes memory result) {
+        if (msg.sender != address(poolManager)) {
+            revert CallerIsNotPoolManager();
+        }
+
+        (bytes1 action, PoolKey memory key) = abi.decode(_data, (bytes1, PoolKey));
+        if (action == _CLOSE_BIDWALL) {
+            bidWall.closeBidWall(key);
+        } else if (action == _CLOSE_FAIR_LAUNCH) {
+            _closeExpiredFairLaunch(key);
+        } else {
+            revert UnknownUnlockAction();
+        }
+
+        return result;
     }
 
 
@@ -1227,21 +1265,6 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
         } else if (_delta.amount1() > 0) {
             poolManager.take(_poolKey.currency1, address(this), uint(int(_delta.amount1())));
         }
-    }
-
-    /**
-     * This function should only be called by the `closeBidWall` function to unlock the {PoolManager}
-     * interactions for the `{BidWall}.closeBidWall` function.
-     *
-     * @param _data The encoded {PoolKey} for the `closeBidWall` request
-     *
-     * @return result Empty data; nothing will be returned
-     */
-    function unlockCallback(
-        bytes calldata _data
-    ) internal returns (bytes memory result) {
-        bidWall.closeBidWall(abi.decode(_data, (PoolKey)));
-        return result;
     }
 
     /**

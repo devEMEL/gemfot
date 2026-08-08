@@ -80,29 +80,41 @@ if [[ "${VERIFY}" == "true" ]]; then
     FORGE_FLAGS+=(--verify --verifier "${VERIFIER}" --verifier-url "${VERIFIER_URL}")
 fi
 
-# deploy <ScriptFile>:<ScriptContract>
-# Runs a forge script and echoes the deployed address (parsed from the script return value).
+# deploy <VarName> <ScriptFile>:<ScriptContract>
+# Runs a forge script (retrying up to 3 times on flaky RPC / missing return value) and
+# exports the parsed address into <VarName>.
+#
+# The forge output goes to stderr; only the summary line goes to stdout. This keeps the
+# caller-side assignment `deploy ...` from accidentally capturing forge noise, and it runs in
+# the main shell so a failure exits the script immediately (no `| tail -1` subshell to swallow it).
 deploy() {
-    local target="$1"
+    local var="$1"
+    local target="$2"
     local name="${target##*:}"
 
     echo ""
-    echo "==> Deploying ${name} ..."
+    echo "==> Deploying ${name} ..." >&2
 
-    local output
-    output="$(forge script "script/${target}" "${FORGE_FLAGS[@]}" 2>&1)"
-    echo "${output}"
-
-    # The scripts return a single `address`, printed by forge as `initialPrice_: address 0x...`
-    local address
-    address="$(echo "${output}" | grep -Eo 'address 0x[a-fA-F0-9]{40}' | tail -1 | awk '{print $2}')"
+    local output="" address=""
+    local attempt
+    for attempt in 1 2 3; do
+        if output="$(forge script "script/${target}" "${FORGE_FLAGS[@]}" 2>&1)"; then
+            # The scripts return a single `address`, printed by forge as `initialPrice_: address 0x...`
+            address="$(printf '%s\n' "${output}" | grep -Eo '[a-zA-Z0-9_]+_: address 0x[a-fA-F0-9]{40}' | tail -1 | awk '{print $NF}')"
+            [[ -n "${address}" ]] && break
+        fi
+        echo "!! Attempt ${attempt} failed for ${name} (no address parsed), retrying ..." >&2
+    done
+    echo "${output}" >&2
 
     if [[ -z "${address}" ]]; then
         echo "!! Could not parse deployed address for ${name}" >&2
         exit 1
     fi
 
-    echo "${address}"
+    printf -v "${var}" '%s' "${address}"
+    export "${var}"
+    echo "${name} -> ${address}"
 }
 
 # ---------------------------------------------------------------------------- #
@@ -112,41 +124,41 @@ deploy() {
 echo "Deploying GemFot protocol to ${NETWORK} with deployer ${DEPLOYER}"
 
 # 1. Initial price calculator
-export INITIAL_PRICE="$(deploy DeployMarketCappedPrice.s.sol:DeployMarketCappedPrice | tail -1)"
+deploy INITIAL_PRICE DeployMarketCappedPrice.s.sol:DeployMarketCappedPrice
 
 # 2. Fee exemptions
-export FEE_EXEMPTIONS="$(deploy DeployFeeExemptions.s.sol:DeployFeeExemptions | tail -1)"
+deploy FEE_EXEMPTIONS DeployFeeExemptions.s.sol:DeployFeeExemptions
 
 # 3. Treasury action manager
-export ACTION_MANAGER="$(deploy DeployActionManager.s.sol:DeployActionManager | tail -1)"
+deploy ACTION_MANAGER DeployActionManager.s.sol:DeployActionManager
 
 # 4. Indexer subscriber (required by the FeeEscrow)
-export INDEXER="$(deploy DeployIndexer.s.sol:DeployIndexer | tail -1)"
+deploy INDEXER DeployIndexer.s.sol:DeployIndexer
 
 # 5. Fee escrow (requires NATIVE_TOKEN + INDEXER)
-export FEE_ESCROW="$(deploy DeployFeeEscrow.s.sol:DeployFeeEscrow | tail -1)"
+deploy FEE_ESCROW DeployFeeEscrow.s.sol:DeployFeeEscrow
 
 # 6. Fee escrow registry (optional bookkeeping contract)
-export FEE_ESCROW_REGISTRY="$(deploy DeployFeeEscrowRegistry.s.sol:DeployFeeEscrowRegistry | tail -1)"
+deploy FEE_ESCROW_REGISTRY DeployFeeEscrowRegistry.s.sol:DeployFeeEscrowRegistry
 
 # 7. Protocol fee recipient
-export PROTOCOL_FEE_RECIPIENT="$(deploy DeployProtocolFeeRecipient.s.sol:DeployProtocolFeeRecipient | tail -1)"
+deploy PROTOCOL_FEE_RECIPIENT DeployProtocolFeeRecipient.s.sol:DeployProtocolFeeRecipient
 
 # 8. Fair launch (requires POOL_MANAGER)
-export FAIR_LAUNCH="$(deploy DeployFairLaunch.s.sol:DeployFairLaunch | tail -1)"
+deploy FAIR_LAUNCH DeployFairLaunch.s.sol:DeployFairLaunch
 
 # 9. Bid wall (requires NATIVE_TOKEN + POOL_MANAGER + PROTOCOL_OWNER)
-export BID_WALL="$(deploy DeployBidWall.s.sol:DeployBidWall | tail -1)"
+deploy BID_WALL DeployBidWall.s.sol:DeployBidWall
 
 # 10. Clonable implementations
-export MEMECOIN_IMPLEMENTATION="$(deploy DeployMemecoin.s.sol:DeployMemecoin | tail -1)"
-export MEMECOIN_TREASURY_IMPLEMENTATION="$(deploy DeployMemecoinTreasury.s.sol:DeployMemecoinTreasury | tail -1)"
+deploy MEMECOIN_IMPLEMENTATION DeployMemecoin.s.sol:DeployMemecoin
+deploy MEMECOIN_TREASURY_IMPLEMENTATION DeployMemecoinTreasury.s.sol:DeployMemecoinTreasury
 
 # 11. GemFotManager hook (CREATE2 mined address, requires all of the above)
-export GEMFOT_MANAGER="$(deploy DeployGemFotManager.s.sol:DeployGemFotManager | tail -1)"
+deploy GEMFOT_MANAGER DeployGemFotManager.s.sol:DeployGemFotManager
 
 # 12. Launch ERC721 (requires the implementations + GEMFOT_MANAGER)
-export LAUNCH="$(deploy DeployLaunch.s.sol:DeployLaunch | tail -1)"
+deploy LAUNCH DeployLaunch.s.sol:DeployLaunch
 
 # 13. Notifier + subscribers
 #
@@ -155,16 +167,16 @@ export LAUNCH="$(deploy DeployLaunch.s.sol:DeployLaunch | tail -1)"
 # subscribers wired to a contract that never notifies, so we read it off the hook instead.
 export NOTIFIER="$(cast call "${GEMFOT_MANAGER}" "notifier()(address)" --rpc-url "${RPC_URL}")"
 echo "==> Notifier (deployed by GemFotManager): ${NOTIFIER}"
-export PREVENT_NO_FAIR_LAUNCH="$(deploy DeployPreventNoFairLaunch.s.sol:DeployPreventNoFairLaunch | tail -1)"
+deploy PREVENT_NO_FAIR_LAUNCH DeployPreventNoFairLaunch.s.sol:DeployPreventNoFairLaunch
 
 
 # 14. Zaps
-export POOL_SWAP="$(deploy DeployPoolSwap.s.sol:DeployPoolSwap | tail -1)"
+deploy POOL_SWAP DeployPoolSwap.s.sol:DeployPoolSwap
 
 # 15. Treasury actions (BuyBack requires POOL_SWAP)
-export BLANK_ACTION="$(deploy DeployBlankAction.s.sol:DeployBlankAction | tail -1)"
-export BURN_TOKENS_ACTION="$(deploy DeployBurnTokensAction.s.sol:DeployBurnTokensAction | tail -1)"
-export BUY_BACK_ACTION="$(deploy DeployBuyBackAction.s.sol:DeployBuyBackAction | tail -1)"
+deploy BLANK_ACTION DeployBlankAction.s.sol:DeployBlankAction
+deploy BURN_TOKENS_ACTION DeployBurnTokensAction.s.sol:DeployBurnTokensAction
+deploy BUY_BACK_ACTION DeployBuyBackAction.s.sol:DeployBuyBackAction
 
 # ---------------------------------------------------------------------------- #
 #                          WIRING (SETTERS / ROLES)                            #

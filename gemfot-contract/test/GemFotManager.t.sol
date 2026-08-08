@@ -333,8 +333,10 @@ contract GemFotManagerTest is Test {
         address memecoin = _launchToken();
         PoolKey memory key = manager.poolKey(memecoin);
 
-        // Warp past fair launch window
+        // Warp past the fair launch window and actually close the position, which is
+        // what flips `info.closed` to true and locks out further buys.
         vm.warp(block.timestamp + FAIR_LAUNCH_DURATION + 1);
+        manager.closeExpiredFairLaunch(key);
 
         uint buyAmount = 1_000 * 10 ** USDC_DECIMALS;
 
@@ -351,8 +353,8 @@ contract GemFotManagerTest is Test {
 
     /**
      * `closeExpiredFairLaunch` seeds the pool with single sided liquidity, which requires the
-     * {PoolManager} to be unlocked. Callers therefore have to route the call through
-     * `IPoolManager.unlock`, which this test does via `_closeFairLaunch`.
+     * {PoolManager} to be unlocked. The {GemFotManager} takes the unlock itself, so callers can
+     * invoke it directly.
      */
     function test_CloseExpiredFairLaunchInitializesPool() public {
         address memecoin = _launchToken();
@@ -366,8 +368,8 @@ contract GemFotManagerTest is Test {
         // Warp past fair launch window
         vm.warp(block.timestamp + FAIR_LAUNCH_DURATION + 1);
 
-        // Close fair launch from within an unlocked {PoolManager} context
-        _closeFairLaunch(key);
+        // Close the fair launch; the manager takes the {PoolManager} unlock itself
+        manager.closeExpiredFairLaunch(key);
 
         // Verify fair launch is closed
         FairLaunch.FairLaunchInfo memory infoAfter = fairLaunch.fairLaunchInfo(poolId);
@@ -378,12 +380,19 @@ contract GemFotManagerTest is Test {
         assertGt(sqrtPriceX96, 0, "Pool should be initialized");
     }
 
-    function test_RevertWhen_CloseFairLaunchWhileActive() public {
+    /// Closing is allowed even while the fair launch window is still open.
+    function test_CloseFairLaunchWhileActiveClosesThePool() public {
         address memecoin = _launchToken();
         PoolKey memory key = manager.poolKey(memecoin);
+        PoolId poolId = key.toId();
 
-        vm.expectRevert("Fair launch still active");
         manager.closeExpiredFairLaunch(key);
+
+        FairLaunch.FairLaunchInfo memory info = fairLaunch.fairLaunchInfo(poolId);
+        assertTrue(info.closed, "Fair launch should be closed");
+
+        (uint160 sqrtPriceX96,,,) = StateLibrary.getSlot0(poolManager, poolId);
+        assertGt(sqrtPriceX96, 0, "Pool should be initialized");
     }
 
     /* -------------------------------------------------------------------------- */
@@ -487,26 +496,5 @@ contract GemFotManagerTest is Test {
         usdc.approve(address(manager), initialPrice.getLaunchingFee());
         memecoin_ = manager.launch(params);
         vm.stopPrank();
-    }
-
-    /**
-     * Calls `GemFotManager.closeExpiredFairLaunch` from within an unlocked {PoolManager}
-     * context, as the liquidity provisioning it performs requires the lock to be taken.
-     */
-    function _closeFairLaunch(
-        PoolKey memory _key
-    ) internal {
-        poolManager.unlock(abi.encode(_key));
-    }
-
-    /**
-     * Called back by the {PoolManager} while it is unlocked. See `_closeFairLaunch`.
-     */
-    function unlockCallback(
-        bytes calldata _data
-    ) external returns (bytes memory) {
-        require(msg.sender == address(poolManager), "Only PoolManager");
-        manager.closeExpiredFairLaunch(abi.decode(_data, (PoolKey)));
-        return "";
     }
 }

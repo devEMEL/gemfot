@@ -123,7 +123,7 @@ export default function Navbar() {
     { label: 'Campaigns', href: '/campaigns' },
     { label: 'Activity', href: '/activity' },
     { label: 'Profile', href: '/profile' },
-    { label: 'Faucet', href: '/faucet' },
+    { label: 'Faucet', href: 'https://app.mlswapx.xyz/faucet', external: true },
   ];
 
   return (
@@ -140,6 +140,19 @@ export default function Navbar() {
             <nav className="hidden md:flex items-center gap-1">
               {navLinks.map((link) => {
                 const isActive = pathname === link.href;
+                if (link.external) {
+                  return (
+                    <a
+                      key={link.href}
+                      href={link.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 text-[16px] font-medium rounded-md text-white/40 hover:text-white/80 transition-all duration-200"
+                    >
+                      {link.label}
+                    </a>
+                  );
+                }
                 return (
                   <Link 
                     key={link.href}
@@ -263,21 +276,38 @@ export default function Navbar() {
         <div className="flex flex-col h-full pt-16 px-6 md:px-8 pb-12 overflow-y-auto">
           {/* Mobile Nav Links */}
           <nav className="flex flex-col gap-1 mt-4">
-            {navLinks.map((link) => (
-              <Link 
-                key={link.href}
-                to={link.href}
-                onClick={() => setIsMenuOpen(false)}
-                className={`flex items-center justify-between px-4 py-4 rounded-lg transition-all duration-200 ${
-                  pathname === link.href 
-                    ? 'bg-white/[0.05] text-white' 
-                    : 'text-white/40 hover:text-white hover:bg-white/[0.03]'
-                }`}
-              >
-                <span className="text-[17px] font-medium">{link.label}</span>
-                <ArrowRight size={16} className={`transition-all duration-200 ${pathname === link.href ? 'text-primary opacity-100' : 'opacity-0'}`} />
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              if (link.external) {
+                return (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="flex items-center justify-between px-4 py-4 rounded-lg text-white/40 hover:text-white hover:bg-white/[0.03] transition-all duration-200"
+                  >
+                    <span className="text-[17px] font-medium">{link.label}</span>
+                    <ArrowRight size={16} className="opacity-0" />
+                  </a>
+                );
+              }
+              return (
+                <Link 
+                  key={link.href}
+                  to={link.href}
+                  onClick={() => setIsMenuOpen(false)}
+                  className={`flex items-center justify-between px-4 py-4 rounded-lg transition-all duration-200 ${
+                    pathname === link.href 
+                      ? 'bg-white/[0.05] text-white' 
+                      : 'text-white/40 hover:text-white hover:bg-white/[0.03]'
+                  }`}
+                >
+                  <span className="text-[17px] font-medium">{link.label}</span>
+                  <ArrowRight size={16} className={`transition-all duration-200 ${pathname === link.href ? 'text-primary opacity-100' : 'opacity-0'}`} />
+                </Link>
+              );
+            })}
           </nav>
 
           {/* Mobile Authentication Area */}

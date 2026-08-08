@@ -29,7 +29,7 @@ function Thumb({ launch, size = 36 }: { launch: EnrichedLaunch; size?: number })
 function HoldingRow({ launch, account }: { launch: EnrichedLaunch; account: `0x${string}` }) {
   const { data: balance } = useReadContract({
     address: launch.memecoin as `0x${string}`,
-    abi: Erc20Abi as any,
+    abi: (Erc20Abi as any).abi || Erc20Abi,
     functionName: 'balanceOf',
     args: [account],
     query: { refetchInterval: 20_000 },
@@ -74,9 +74,7 @@ export default function Portfolio() {
   const myLaunches = useMemo(() => {
     if (!address) return [];
     return launches.filter(
-      (l) =>
-        String((l as any).creator?.id ?? (l as any).creator ?? '').toLowerCase() ===
-        address.toLowerCase()
+      (l) => String(l.creator ?? '').toLowerCase() === address.toLowerCase()
     );
   }, [launches, address]);
 
@@ -87,7 +85,7 @@ export default function Portfolio() {
 
   const { data: usdcBalance } = useReadContract({
     address: CONTRACTS.nativeToken,
-    abi: Erc20Abi as any,
+    abi: (Erc20Abi as any).abi || Erc20Abi,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
     query: { enabled: !!address, refetchInterval: 15_000 },

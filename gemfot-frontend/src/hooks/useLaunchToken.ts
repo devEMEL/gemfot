@@ -31,7 +31,7 @@ export interface LaunchFormValues {
   startsInSeconds: number;
 }
 
-export type LaunchStep = 'idle' | 'uploading' | 'signing' | 'confirming' | 'done' | 'error';
+export type LaunchStep = 'idle' | 'uploading' | 'approving' | 'signing' | 'confirming' | 'done' | 'error';
 
 export interface LaunchResult {
   txHash: `0x${string}`;
@@ -87,9 +87,10 @@ export function useLaunchToken() {
         const initialTokenFairLaunch =
           (totalSupply * BigInt(Math.round(values.fairLaunchPercent * 100))) / 10_000n;
 
+        // Premine is specified as a % of the fair launch supply
         const premineAmount =
           values.preminePercent > 0
-            ? (totalSupply * BigInt(Math.round(values.preminePercent * 100))) / 10_000n
+            ? (initialTokenFairLaunch * BigInt(Math.round(values.preminePercent * 100))) / 10_000n
             : 0n;
 
         const usdcMarketCap = parseUnits(
@@ -116,7 +117,7 @@ export function useLaunchToken() {
           multiple: Math.max(1, Math.min(255, Math.round(values.multiple))), // uint8
         };
 
-        // `launch` is payable and may require a launching fee
+        // Query launch fee (USDC native token)
         let launchFee = 0n;
         try {
           launchFee = (await publicClient.readContract({
@@ -125,17 +126,75 @@ export function useLaunchToken() {
             functionName: 'getLaunchingFee',
           })) as bigint;
         } catch {
-          launchFee = 0n;
+          launchFee = parseUnits('10', CONTRACTS.nativeTokenDecimals);
         }
 
-        /* ---------------------------------------- 3. Send the tx ----- */
+        /* -------------------------------- 3. Approve USDC fee -------- */
+        if (launchFee > 0n) {
+          const currentAllowance = (await publicClient.readContract({
+            address: CONTRACTS.nativeToken,
+            abi: [
+              {
+                inputs: [
+                  { name: 'owner', type: 'address' },
+                  { name: 'spender', type: 'address' },
+                ],
+                name: 'allowance',
+                outputs: [{ name: '', type: 'uint256' }],
+                stateMutability: 'view',
+                type: 'function',
+              },
+            ],
+            functionName: 'allowance',
+            args: [address, CONTRACTS.gemfotManager],
+          })) as bigint;
+
+          if (currentAllowance < launchFee) {
+            setStep('approving');
+            const approveTxHash = await walletClient.writeContract({
+              address: CONTRACTS.nativeToken,
+              abi: [
+                {
+                  inputs: [
+                    { name: 'spender', type: 'address' },
+                    { name: 'amount', type: 'uint256' },
+                  ],
+                  name: 'approve',
+                  outputs: [{ name: '', type: 'bool' }],
+                  stateMutability: 'nonpayable',
+                  type: 'function',
+                },
+              ],
+              functionName: 'approve',
+              args: [CONTRACTS.gemfotManager, launchFee],
+              account: address,
+            });
+
+            await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
+          }
+        }
+
+        /* ---------------------------------------- 4. Send launch tx -- */
+        console.log('GemFot Launch Parameters:', {
+          formValues: values,
+          contractParams: {
+            ...params,
+            initialTokenFairLaunch: params.initialTokenFairLaunch.toString(),
+            fairLaunchDuration: params.fairLaunchDuration.toString(),
+            premineAmount: params.premineAmount.toString(),
+            launchAt: params.launchAt.toString(),
+            totalSupply: params.totalSupply.toString(),
+            usdcMarketCap: params.usdcMarketCap.toString(),
+          },
+          launchFee: launchFee.toString(),
+        });
+
         setStep('signing');
         const txHash = await walletClient.writeContract({
           address: CONTRACTS.gemfotManager,
-          abi: GemFotManagerAbi as any,
+          abi: (GemFotManagerAbi as any).abi || GemFotManagerAbi,
           functionName: 'launch',
           args: [params],
-          value: launchFee,
           account: address,
         });
 
@@ -184,6 +243,6 @@ export function useLaunchToken() {
     error,
     result,
     reset,
-    isBusy: ['uploading', 'signing', 'confirming'].includes(step),
+    isBusy: ['uploading', 'approving', 'signing', 'confirming'].includes(step),
   };
 }

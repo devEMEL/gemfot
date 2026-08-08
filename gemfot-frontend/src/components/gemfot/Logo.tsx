@@ -54,8 +54,8 @@ export function Logo({
       <LogoMark size={size} className="text-ink" />
 
       {!compact && (
-        <span className="text-[18px] font-extrabold tracking-[-0.04em] leading-none lowercase text-ink">
-          gemfot
+        <span className="text-[18px] font-extrabold tracking-[-0.04em] leading-none text-ink">
+          GemFot
         </span>
       )}
     </Link>

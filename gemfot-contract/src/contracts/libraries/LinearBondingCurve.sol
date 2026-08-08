@@ -115,7 +115,11 @@ library LinearBondingCurve {
         require(multiple >= MIN_MULTIPLE && multiple <= MAX_MULTIPLE, "Multiple out of bounds");
         // p0 = (M/S) / multiple, scaled by 1e18, via mulDiv to avoid precision loss
         // for small maxSupply or large multiple.
-        return Math.mulDiv(targetMarketCap, 1e18, maxSupply * multiple);
+        uint p0_ = Math.mulDiv(targetMarketCap, 1e18, maxSupply * multiple);
+        // Small market caps relative to supply truncate p0 to zero, which leaves the pool
+        // with a zero starting price and reverts pool initialization (division by zero).
+        // Floor p0 at the minimum representable price (1 USDC-wei per whole token).
+        return p0_ == 0 ? 1 : p0_;
     }
 
 

@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import {IHooks} from '@uniswap/v4-core/src/libraries/Hooks.sol';
 import {PoolId} from '@uniswap/v4-core/src/types/PoolId.sol';
 
 import {BaseSubscriber} from '@gemfot/subscribers/Base.sol';
-import {GemFotManager} from '@gemfot/GemFotManager.sol';
 
 
 /**
@@ -44,28 +42,20 @@ contract PreventNoFairLaunch is BaseSubscriber {
     }
 
     /**
-     * Called when `afterInitialize` is fired to ensure that `initialTokenFairLaunch` is
-     * not zero.
-     *
-     * @param _key The notification key
-     * @param _data The data passed during initialization
+     * Called when a notification is fired by the {Notifier}. The minimum fair-launch
+     * supply guard has been disabled, so this is a no-op.
      */
-    function notify(PoolId /* _poolId */, bytes4 _key, bytes calldata _data) public view override onlyNotifier {
-        // We only want to deal with the `afterInitialize` key
-        if (_key != IHooks.afterInitialize.selector) {
-            return;
-        }
-
-        // Decode our parameters to get the Launch parameters
-        (/* uint tokenId */, GemFotManager.LaunchParams memory params) = abi.decode(
-            _data,
-            (uint, GemFotManager.LaunchParams)
-        );
-
-        // If no initial token fair launch was allocated then revert
-        if (params.initialTokenFairLaunch < MINIMUM_INITIAL_TOKENS) {
-            revert InvalidInitialTokenFairLaunch(params.initialTokenFairLaunch, MINIMUM_INITIAL_TOKENS);
-        }
+    function notify(PoolId /* _poolId */, bytes4 /* _key */, bytes calldata /* _data */) public view override onlyNotifier {
+        // The minimum fair-launch supply guard has been disabled so that small-supply
+        // launches are permitted. Kept as a no-op to preserve the subscription wiring.
+        // Previous behavior:
+        //   if (_key != IHooks.afterInitialize.selector) return;
+        //   (/* uint tokenId */, GemFotManager.LaunchParams memory params) = abi.decode(
+        //       _data, (uint, GemFotManager.LaunchParams));
+        //   if (params.initialTokenFairLaunch < MINIMUM_INITIAL_TOKENS) {
+        //       revert InvalidInitialTokenFairLaunch(params.initialTokenFairLaunch, MINIMUM_INITIAL_TOKENS);
+        //   }
+        return;
     }
 
 }

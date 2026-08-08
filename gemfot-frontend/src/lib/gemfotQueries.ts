@@ -29,7 +29,9 @@ export const GET_LAUNCHES = /* GraphQL */ `
       name
       symbol
       tokenUri
-      creator
+      creator {
+        id
+      }
       tokenId
       currencyFlipped
       initialTokenFairLaunch
@@ -60,7 +62,9 @@ export const GET_LAUNCH = /* GraphQL */ `
       name
       symbol
       tokenUri
-      creator
+      creator {
+        id
+      }
       tokenId
       currencyFlipped
       initialTokenFairLaunch
@@ -141,7 +145,8 @@ export interface SubgraphLaunch {
   name: string;
   symbol: string;
   tokenUri: string;
-  creator: string;
+  /** Related entity id (also accepts the raw `{ id }` shape before normalization) */
+  creator: string | { id: string };
   tokenId: string;
   currencyFlipped: boolean;
   initialTokenFairLaunch: string;

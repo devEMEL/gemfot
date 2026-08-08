@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAccount, useReadContract } from 'wagmi';
-import { formatUnits } from 'viem';
+import { formatUnits, parseUnits } from 'viem';
 import {
   ArrowLeft,
   Check,
@@ -16,6 +16,7 @@ import { useLaunch } from '@/hooks/useLaunch';
 import { useSwap } from '@/hooks/useSwap';
 import { CONTRACTS, explorerAddress, explorerTx } from '@/config/networks';
 import { countdown, fmtNative, fmtToken, progressPct, shortAddress, timeAgo } from '@/lib/format';
+import { quoteFairLaunchBuy } from '@/lib/fairLaunchQuote';
 import Erc20Abi from '@/abi/ERC20.json';
 
 /** Square ledger cell — matches the Explore stat strip. */
@@ -49,7 +50,7 @@ export default function TokenDetail() {
 
   const { data: nativeBalance } = useReadContract({
     address: CONTRACTS.nativeToken,
-    abi: Erc20Abi as any,
+    abi: (Erc20Abi as any).abi || Erc20Abi,
     functionName: 'balanceOf',
     args: account ? [account] : undefined,
     query: { enabled: !!account, refetchInterval: 12_000 },
@@ -57,7 +58,7 @@ export default function TokenDetail() {
 
   const { data: tokenBalance } = useReadContract({
     address: tokenAddress as `0x${string}`,
-    abi: Erc20Abi as any,
+    abi: (Erc20Abi as any).abi || Erc20Abi,
     functionName: 'balanceOf',
     args: account ? [account] : undefined,
     query: { enabled: !!account && !!tokenAddress, refetchInterval: 12_000 },
@@ -387,6 +388,32 @@ export default function TokenDetail() {
                   className="input-field num w-full h-14 px-4 text-[24px] font-semibold mb-2.5"
                 />
 
+                {side === 'buy' && amount && Number(amount) > 0 && launch && (
+                  <div className="mb-3 px-3.5 py-2.5 bg-gem-50 border border-gem-200 rounded-lg flex items-center justify-between">
+                    <span className="eyebrow text-[11px] text-ink-mute">Estimated receive</span>
+                    <span className="num text-[14px] font-bold text-gem-800">
+                      ≈ {fmtToken(
+                        (() => {
+                          const nativeIn = parseUnits(
+                            amount,
+                            CONTRACTS.nativeTokenDecimals
+                          );
+                          const quote = quoteFairLaunchBuy(
+                            {
+                              targetMarketCap: launch.targetMarketCap,
+                              initialTokenFairLaunch: launch.initialTokenFairLaunch,
+                              multiple: launch.multiple,
+                              remainingSupply: launch.remainingSupply,
+                            },
+                            nativeIn
+                          );
+                          return quote.tokensOut.toString();
+                        })()
+                      )} {launch.symbol}
+                    </span>
+                  </div>
+                )}
+
                 <div className="seg w-full h-8 mb-4">
                   {['25', '50', '75', '100'].map((p) => (
                     <button
@@ -453,15 +480,30 @@ export default function TokenDetail() {
 
             <div className="card">
               <div className="px-5 py-3 border-b border-ink/12">
-                <h3 className="text-[14px] font-bold tracking-tight">Launch parameters</h3>
+                <h3 className="text-[14px] font-bold tracking-tight">Launch details & parameters</h3>
               </div>
               <div className="divide-y divide-ink/8">
                 {[
                   ['Fair launch supply', fmtToken(launch.initialTokenFairLaunch)],
-                  ['Duration', `${Math.round(Number(launch.fairLaunchDuration) / 60)} min`],
+                  ['Duration', `${(Number(launch.fairLaunchDuration) / 3600).toFixed(2)} hours`],
+                  [
+                    'Deadline',
+                    launch.fairLaunchEndsAt && Number(launch.fairLaunchEndsAt) > 0
+                      ? new Date(Number(launch.fairLaunchEndsAt) * 1000).toLocaleString()
+                      : 'N/A',
+                  ],
+                  [
+                    'Starts at (flaunchesAt)',
+                    launch.fairLaunchStartsAt && Number(launch.fairLaunchStartsAt) > 0
+                      ? new Date(Number(launch.fairLaunchStartsAt) * 1000).toLocaleString()
+                      : 'Immediate',
+                  ],
                   ['Premine', fmtToken(launch.premineAmount)],
                   ['Creator fee', `${Number(launch.creatorFeeAllocation) / 100}%`],
                   ['Multiple', `${launch.multiple}×`],
+                  ['Pool ID', shortAddress(launch.poolId, 6)],
+                  ['Currency Flipped', launch.currencyFlipped ? 'Yes' : 'No'],
+                  ['Status', launch.fairLaunchClosed ? 'Closed' : launch.isLive ? 'Live' : 'Ended'],
                 ].map(([k, v]) => (
                   <div key={k} className="flex items-baseline justify-between px-5 py-2.5">
                     <span className="text-[13px] text-ink-mute">{k}</span>

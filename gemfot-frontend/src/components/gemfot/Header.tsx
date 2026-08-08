@@ -6,10 +6,17 @@ import { Menu, X, LogOut, Copy, Check, ChevronDown } from 'lucide-react';
 import { Logo } from './Logo';
 import { activeNetwork } from '@/config/networks';
 
-const NAV_LINKS = [
+interface NavLinkItem {
+  label: string;
+  href: string;
+  external?: boolean;
+}
+
+const NAV_LINKS: NavLinkItem[] = [
   { label: 'Explore', href: '/' },
   { label: 'Launch', href: '/launch' },
   { label: 'Portfolio', href: '/portfolio' },
+  { label: 'Faucet', href: 'https://app.mlswapx.xyz/faucet', external: true },
 ];
 
 function Avatar({ address, size = 22 }: { address: string; size?: number }) {
@@ -60,7 +67,20 @@ export default function Header() {
 
               <nav className="hidden md:flex items-center gap-6">
                 {NAV_LINKS.map((link) => {
-                  const active = isActive(link.href);
+                  const active = !link.external && isActive(link.href);
+                  if (link.external) {
+                    return (
+                      <a
+                        key={link.href}
+                        href={link.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="relative text-[13px] font-semibold tracking-tight text-ink-mute hover:text-ink transition-colors py-[19px]"
+                      >
+                        {link.label}
+                      </a>
+                    );
+                  }
                   return (
                     <Link
                       key={link.href}
@@ -170,21 +190,40 @@ export default function Header() {
       >
         <div className="flex flex-col h-full pt-[58px]">
           <nav className="flex flex-col border-t border-ink/12">
-            {NAV_LINKS.map((link, i) => (
-              <Link
-                key={link.href}
-                to={link.href}
-                onClick={() => setMobileOpen(false)}
-                className={`flex items-baseline gap-4 px-6 py-6 border-b border-ink/12 transition-colors ${
-                  isActive(link.href) ? 'bg-white text-ink' : 'text-ink-soft hover:bg-white'
-                }`}
-              >
-                <span className="mono text-[10px] text-ink-mute">
-                  {String(i + 1).padStart(2, '0')}
-                </span>
-                <span className="text-[26px] font-extrabold tracking-[-0.03em]">{link.label}</span>
-              </Link>
-            ))}
+            {NAV_LINKS.map((link, i) => {
+              if (link.external) {
+                return (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-baseline gap-4 px-6 py-6 border-b border-ink/12 text-ink-soft hover:bg-white transition-colors"
+                  >
+                    <span className="mono text-[10px] text-ink-mute">
+                      {String(i + 1).padStart(2, '0')}
+                    </span>
+                    <span className="text-[26px] font-extrabold tracking-[-0.03em]">{link.label}</span>
+                  </a>
+                );
+              }
+              return (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  onClick={() => setMobileOpen(false)}
+                  className={`flex items-baseline gap-4 px-6 py-6 border-b border-ink/12 transition-colors ${
+                    isActive(link.href) ? 'bg-white text-ink' : 'text-ink-soft hover:bg-white'
+                  }`}
+                >
+                  <span className="mono text-[10px] text-ink-mute">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <span className="text-[26px] font-extrabold tracking-[-0.03em]">{link.label}</span>
+                </Link>
+              );
+            })}
           </nav>
 
           <div className="mt-auto p-6 space-y-3">
