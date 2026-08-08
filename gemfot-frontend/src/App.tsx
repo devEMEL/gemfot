@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import Providers from '@/components/gemfot/Providers';
 import Header from '@/components/gemfot/Header';
 import Footer from '@/components/gemfot/Footer';
@@ -19,7 +19,7 @@ export default function App() {
               <Route path="/launch" element={<LaunchToken />} />
               <Route path="/token/:address" element={<TokenDetail />} />
               <Route path="/portfolio" element={<Portfolio />} />
-              <Route path="*" element={<Explore />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>
           <Footer />
