@@ -555,7 +555,7 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
 
 
 
-        /**
+    /**
      * If in fair launch window, we need to prevent liquidity being added. We can, however, modify
      * liquidity if we are making the call from the BidWall or FairLaunch contracts.
      *
@@ -767,9 +767,13 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
     ) external {
         PoolId poolId = _key.toId();
 
-        if (!fairLaunch.inFairLaunchWindow(poolId)) {
+        // if (!fairLaunch.inFairLaunchWindow(poolId)) {
+        //     revert FairLaunch.FairLaunchWindowHasClosed();
+        // }
+         FairLaunch.FairLaunchInfo memory info_ = fairLaunch.fairLaunchInfo(poolId);
+         if(info_.closed) {
             revert FairLaunch.FairLaunchWindowHasClosed();
-        }
+         }
 
         uint _launchesAt = launchesAt[poolId];
         int premineAmount;
@@ -848,8 +852,8 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
         PoolId poolId = _key.toId();
         FairLaunch.FairLaunchInfo memory info = fairLaunch.fairLaunchInfo(poolId);
         
-        require(!info.closed, "Already closed");
-        require(info.remainingSupply == 0 || !fairLaunch.inFairLaunchWindow(poolId), "Fair launch still active");
+        // require(!info.closed, "Already closed");
+        // require(info.remainingSupply == 0 || !fairLaunch.inFairLaunchWindow(poolId), "Fair launch still active");
         
         _clearUnusedPremine(poolId);
         bool nativeIsZero = Currency.unwrap(_key.currency0) == nativeToken;
@@ -879,7 +883,8 @@ contract GemFotManager is BaseHook, FeeDistributor, InternalSwapPool, StoreKeys 
             _tokenFees: _poolFees[poolId].amount1,
             _nativeIsZero: nativeIsZero,
             _sqrtPriceX96: sqrtPriceX96
-        });
+        }); // info.closed is set to true here
+
     }
 
     /**
