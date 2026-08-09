@@ -407,6 +407,7 @@ export default function LaunchToken() {
               </Field>
             </div>
 
+            {/* Premine disabled — not implemented in contract
             <Field label="Premine" hint="% of fair launch supply, optional">
               <div className="relative">
                 <input
@@ -420,7 +421,7 @@ export default function LaunchToken() {
                   %
                 </span>
               </div>
-            </Field>
+            </Field> */}
           </Section>
 
           {/* ------------------------------------------------ the curve */}
@@ -580,10 +581,11 @@ export default function LaunchToken() {
                 <span className="text-white/50">Fair Launch Supply</span>
                 <span className="text-white">{form.fairLaunchPercent}%</span>
               </div>
+              {/* Premine disabled — not implemented in contract
               <div className="flex justify-between py-1 border-b border-white/5">
                 <span className="text-white/50">Premine (% of Fairlaunch)</span>
                 <span className="text-white">{form.preminePercent}%</span>
-              </div>
+              </div> */}
               <div className="flex justify-between py-1 border-b border-white/5">
                 <span className="text-white/50">Fair Launch Duration</span>
                 <span className="text-white">{formatDuration(form.fairLaunchDuration)}</span>

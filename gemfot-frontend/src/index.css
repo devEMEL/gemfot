@@ -36,10 +36,11 @@
     rgba(0, 0, 0, 0.92) 100%
   );
   --gradient-box-strong: linear-gradient(135deg, #8fcb3b 0%, #3baa35 100%);
-
+  
+  --font-raleway: "Raleway", ui-sans-serif, sans-serif;
   --font-ubuntu: "Ubuntu", ui-sans-serif, sans-serif;
+  --font-ubuntu-mono: "Ubuntu Mono", ui-sans-serif, sans-serif;
   --font-figtree: "Figtree", ui-sans-serif, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 
   /* Everything is square in this system. */
   --radius-sm: 0px;
