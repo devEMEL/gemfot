@@ -40,7 +40,7 @@ export function LogoMark({
 
 export function Logo({
   compact = false,
-  size = 30,
+  size = 42,
 }: {
   compact?: boolean;
   size?: number;
@@ -48,13 +48,13 @@ export function Logo({
   return (
     <Link
       to="/"
-      className="flex items-center gap-2.5 group shrink-0 pl-1 pr-2 py-1"
+      className="flex items-center gap-3 group shrink-0 pl-1 pr-2 py-1"
       aria-label="GemFot home"
     >
       <LogoMark size={size} className="text-ink" />
 
       {!compact && (
-        <span className="text-[18px] font-extrabold tracking-[-0.04em] leading-none text-ink">
+        <span className="text-[20px] font-extrabold tracking-[-0.04em] leading-none text-ink">
           GemFot
         </span>
       )}

@@ -12,13 +12,13 @@ import Erc20Abi from '@/abi/ERC20.json';
 function Thumb({ launch, size = 36 }: { launch: EnrichedLaunch; size?: number }) {
   return (
     <div
-      className="overflow-hidden bg-gem-100 border border-ink/12 shrink-0 flex items-center justify-center"
+      className="overflow-hidden border border-white/[0.08] shrink-0 flex items-center justify-center"
       style={{ width: size, height: size }}
     >
       {launch.imageUrl ? (
         <img src={launch.imageUrl} alt={launch.symbol} className="w-full h-full object-cover" />
       ) : (
-        <span className="mono text-gem-800 text-[11px] font-semibold">
+        <span className="mono text-yellow-300 text-[11px] font-semibold">
           {launch.symbol.slice(0, 3).toUpperCase()}
         </span>
       )}
@@ -41,16 +41,16 @@ function HoldingRow({ launch, account }: { launch: EnrichedLaunch; account: `0x$
   return (
     <Link
       to={`/token/${launch.memecoin}`}
-      className="flex items-center gap-3 px-5 py-3 hover:bg-gem-50 transition-colors"
+      className="flex items-center gap-3 px-5 py-3 hover:bg-yellow-500/5 transition-colors border-b border-white/[0.03]"
     >
       <Thumb launch={launch} />
       <div className="min-w-0 flex-1">
-        <p className="text-[14px] font-bold tracking-tight truncate">{launch.name}</p>
-        <p className="mono text-[10px] text-ink-mute mt-0.5">{launch.symbol}</p>
+        <p className="text-[14px] font-bold tracking-tight truncate text-white">{launch.name}</p>
+        <p className="mono text-[10px] text-white/40 mt-0.5">{launch.symbol}</p>
       </div>
       <div className="text-right shrink-0">
-        <p className="num text-[14px] font-semibold">{compact(Number(formatUnits(raw, 18)))}</p>
-        <p className="mono text-[10px] text-ink-mute mt-0.5">{launch.symbol}</p>
+        <p className="num text-[14px] font-semibold text-white">{compact(Number(formatUnits(raw, 18)))}</p>
+        <p className="mono text-[10px] text-white/40 mt-0.5">{launch.symbol}</p>
       </div>
     </Link>
   );
@@ -58,10 +58,10 @@ function HoldingRow({ launch, account }: { launch: EnrichedLaunch; account: `0x$
 
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="bg-white px-4 py-3.5 md:px-5 md:py-4 flex flex-col justify-between min-w-0">
+    <div className="bg-black px-4 py-3.5 md:px-5 md:py-4 flex flex-col justify-between min-w-0">
       <span className="eyebrow">{label}</span>
-      <p className="num text-[22px] font-semibold leading-none mt-2.5 truncate">{value}</p>
-      {hint && <p className="mono text-[10px] text-ink-mute mt-1.5 truncate">{hint}</p>}
+      <p className="num text-[22px] font-semibold text-yellow-300 leading-none mt-2.5 truncate">{value}</p>
+      {hint && <p className="mono text-[10px] text-white/30 mt-1.5 truncate">{hint}</p>}
     </div>
   );
 }
@@ -93,14 +93,14 @@ export default function Portfolio() {
 
   if (!isConnected) {
     return (
-      <div className="max-w-2xl mx-auto px-4 pt-40 pb-24">
-        <div className="card hatch p-14 text-center flex flex-col items-center gap-3">
+      <div className="max-w-2xl mx-auto px-4 pt-40 pb-24 bg-black min-h-screen">
+        <div className="border border-yellow-400/20 bg-gradient-to-b from-yellow-500/5 to-transparent rounded-xl p-14 text-center flex flex-col items-center gap-3">
           <span className="eyebrow">Wallet required</span>
-          <p className="display text-[26px]">Connect your wallet</p>
-          <p className="text-ink-soft text-[14px] max-w-[38ch]">
+          <p className="display text-[26px] text-white">Connect your wallet</p>
+          <p className="text-white/70 text-[14px] max-w-[38ch]">
             See the tokens you hold and the launches you created.
           </p>
-          <button onClick={() => open()} className="btn btn-primary h-11 px-6 mt-2">
+          <button onClick={() => open()} className="btn btn-primary h-11 px-6 mt-2 yellow-gradient">
             Connect wallet
           </button>
         </div>
@@ -109,17 +109,17 @@ export default function Portfolio() {
   }
 
   return (
-    <div className="pt-[58px]">
+    <div className="pt-[58px] min-h-screen bg-black text-white">
       {/* --------------------------------------------------- title bar -- */}
-      <div className="border-b border-ink/12 bg-white">
+      <div className="border-b border-yellow-400/10 bg-black/40">
         <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-8">
           <span className="eyebrow">Account</span>
-          <h1 className="display text-[34px] md:text-[46px] mt-3">Portfolio</h1>
+          <h1 className="display text-[34px] md:text-[46px] mt-3 text-white">Portfolio</h1>
           <a
             href={explorerAddress(address!)}
             target="_blank"
             rel="noopener noreferrer"
-            className="mono text-[11px] text-ink-mute hover:text-ink transition-colors break-all mt-2 inline-block"
+            className="mono text-[11px] text-white/30 hover:text-yellow-300 transition-colors break-all mt-2 inline-block"
           >
             {address}
           </a>
@@ -127,9 +127,9 @@ export default function Portfolio() {
       </div>
 
       {/* ------------------------------------------------- stat ledger -- */}
-      <div className="border-b border-ink/12 bg-ink/[0.04]">
+      <div className="border-b border-yellow-400/10 bg-black/40">
         <div className="max-w-[1200px] mx-auto px-4 md:px-6">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-ink/12 border-x border-ink/12">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-yellow-400/5 border-x border-yellow-400/10">
             <Stat
               label={`${CONTRACTS.nativeTokenSymbol} balance`}
               value={fmtNative((usdcBalance as bigint) ?? 0n)}
@@ -148,22 +148,22 @@ export default function Portfolio() {
 
       <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-8 grid lg:grid-cols-2 gap-5 items-start">
         {/* ------------------------------------------------- holdings -- */}
-        <div className="card">
-          <div className="px-5 py-3 border-b border-ink/12 flex items-center justify-between">
-            <h2 className="text-[14px] font-bold tracking-tight">Your holdings</h2>
+        <div className="border border-white/[0.04] bg-gradient-to-b from-yellow-500/3 to-transparent rounded-xl">
+          <div className="px-5 py-3 border-b border-yellow-400/10 flex items-center justify-between">
+            <h2 className="text-[14px] font-bold tracking-tight text-white">Your holdings</h2>
             <span className="eyebrow">ERC-20</span>
           </div>
           {loading ? (
             <div className="py-16 flex justify-center">
-              <Loader2 size={20} className="animate-spin text-ink-mute" />
+              <Loader2 size={20} className="animate-spin text-white/20" />
             </div>
           ) : (
-            <div className="divide-y divide-ink/8">
+            <div className="divide-y divide-yellow-400/5">
               {launches.map((l) => (
                 <HoldingRow key={l.id} launch={l} account={address!} />
               ))}
               {launches.length === 0 && (
-                <p className="px-5 py-14 text-center text-ink-mute text-[14px]">
+                <p className="px-5 py-14 text-center text-white/50 text-[14px]">
                   No GemFot tokens found in this wallet yet.
                 </p>
               )}
@@ -172,42 +172,42 @@ export default function Portfolio() {
         </div>
 
         {/* ---------------------------------------------- my launches -- */}
-        <div className="card">
-          <div className="px-5 py-3 border-b border-ink/12 flex items-center justify-between">
-            <h2 className="text-[14px] font-bold tracking-tight">Launches you created</h2>
+        <div className="border border-white/[0.04] bg-gradient-to-b from-yellow-500/3 to-transparent rounded-xl">
+          <div className="px-5 py-3 border-b border-yellow-400/10 flex items-center justify-between">
+            <h2 className="text-[14px] font-bold tracking-tight text-white">Launches you created</h2>
             <span className="eyebrow">{String(myLaunches.length).padStart(2, '0')}</span>
           </div>
 
           {myLaunches.length === 0 ? (
             <div className="px-5 py-14 flex flex-col items-center gap-3 text-center">
-              <p className="text-ink-soft text-[14px]">You haven't launched a token yet.</p>
-              <Link to="/launch" className="btn btn-primary h-10 px-5">
+              <p className="text-white/70 text-[14px]">You haven't launched a token yet.</p>
+              <Link to="/launch" className="btn btn-primary h-10 px-5 yellow-gradient">
                 Launch a token
               </Link>
             </div>
           ) : (
-            <div className="divide-y divide-ink/8">
+            <div className="divide-y divide-yellow-400/5">
               {myLaunches.map((l) => (
                 <Link
                   key={l.id}
                   to={`/token/${l.memecoin}`}
-                  className="flex items-center gap-3 px-5 py-3 hover:bg-gem-50 transition-colors"
+                  className="flex items-center gap-3 px-5 py-3 hover:bg-yellow-500/5 transition-colors border-b border-white/[0.03]"
                 >
                   <Thumb launch={l} />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[14px] font-bold tracking-tight truncate">{l.name}</p>
-                    <p className="mono text-[10px] text-ink-mute mt-0.5">
+                    <p className="text-[14px] font-bold tracking-tight truncate text-white">{l.name}</p>
+                    <p className="mono text-[10px] text-white/40 mt-0.5">
                       {l.symbol} · {timeAgo(Number(l.createdAtTimestamp))}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="num text-[14px] font-semibold">
+                    <p className="num text-[14px] font-semibold text-white">
                       {fmtNative(l.revenue)}{' '}
-                      <span className="text-ink-mute text-[11px]">
+                      <span className="text-white/40">
                         {CONTRACTS.nativeTokenSymbol}
                       </span>
                     </p>
-                    <p className="mono text-[10px] text-gem-700 mt-0.5">
+                    <p className="mono text-[10px] text-yellow-300 mt-0.5">
                       {progressPct(l.initialTokenFairLaunch, l.remainingSupply).toFixed(1)}% filled
                     </p>
                   </div>

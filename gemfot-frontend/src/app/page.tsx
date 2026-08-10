@@ -507,7 +507,7 @@ export default function SwapPage() {
           {!isConnected ? (
             <button 
               onClick={() => open()}
-              className="w-full mt-4 py-3 px-6 rounded-full bg-primary text-black text-[10px] uppercase tracking-[0.2em] font-bold transition-all gold-glow hover:brightness-110 active:scale-[0.98] cursor-pointer"
+              className="w-full mt-4 py-3 px-6 rounded-full bg-primary text-black text-[10px] uppercase tracking-[0.2em] font-bold transition-all gold-glow hover:brightness-110 yellow-gradient active:scale-[0.98] cursor-pointer"
             >
               Connect Wallet
             </button>
@@ -515,7 +515,7 @@ export default function SwapPage() {
             <button 
               onClick={handleSwapClick}
               disabled={quoteLoading || !!quoteError || !inputAmount || Number(inputAmount) <= 0 || !outputAmount || Number(outputAmount) <= 0}
-              className="w-full mt-4 py-3 px-6 rounded-full bg-primary text-black text-[10px] uppercase tracking-[0.2em] font-bold transition-all gold-glow hover:brightness-110 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              className="w-full mt-4 py-3 px-6 rounded-full bg-primary text-black text-[10px] uppercase tracking-[0.2em] font-bold transition-all gold-glow hover:brightness-110 yellow-gradient active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               SWAP
             </button>

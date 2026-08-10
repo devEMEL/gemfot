@@ -58,14 +58,14 @@ export default function Header() {
 
   return (
     <>
-      <header className="fixed top-0 inset-x-0 z-50 bg-cream/92 backdrop-blur-md border-b border-ink/12">
+      <header className="fixed top-0 inset-x-0 z-50 bg-black/92 backdrop-blur-md border-b border-yellow-400/10">
         <div className="max-w-[1400px] mx-auto px-4 md:px-6">
           <div className="h-[58px] flex items-center justify-between gap-6">
             {/* ------------------------------------------------- left --- */}
             <div className="flex items-center gap-7 min-w-0">
               <Logo />
 
-              <nav className="hidden md:flex items-center gap-6">
+              <nav className="hidden md:flex items-center gap-8">
                 {NAV_LINKS.map((link) => {
                   const active = !link.external && isActive(link.href);
                   if (link.external) {
@@ -75,7 +75,7 @@ export default function Header() {
                         href={link.href}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="relative text-[13px] font-semibold tracking-tight text-ink-mute hover:text-ink transition-colors py-[19px]"
+                        className="relative text-[17px] font-semibold tracking-tight text-white/40 hover:text-white transition-colors py-[19px]"
                       >
                         {link.label}
                       </a>
@@ -85,13 +85,13 @@ export default function Header() {
                     <Link
                       key={link.href}
                       to={link.href}
-                      className={`relative text-[13px] font-semibold tracking-tight transition-colors py-[19px] ${
-                        active ? 'text-ink' : 'text-ink-mute hover:text-ink'
+                      className={`relative text-[17px] font-semibold tracking-tight transition-colors py-[19px] ${
+                        active ? 'text-white' : 'text-white/40 hover:text-white'
                       }`}
                     >
                       {link.label}
                       {active && (
-                        <span className="absolute left-0 right-0 -bottom-px h-[2px] bg-ink" />
+                        <span className="absolute left-0 right-0 -bottom-px h-[2px] bg-yellow-400" />
                       )}
                     </Link>
                   );
@@ -101,14 +101,14 @@ export default function Header() {
 
             {/* ------------------------------------------------ right --- */}
             <div className="flex items-center gap-2.5">
-              <div className="hidden lg:flex items-center gap-1.5 mono text-[10px] uppercase tracking-[0.16em] text-ink-mute">
-                <span className="w-1.5 h-1.5 bg-gem-600 animate-blink" />
+              <div className="hidden lg:flex items-center gap-1.5 mono text-[10px] uppercase tracking-[0.16em] text-white/40">
+                <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-blink" />
                 {activeNetwork.label}
               </div>
 
               <div className="hidden md:block relative">
                 {!isConnected ? (
-                  <button onClick={() => open()} className="btn btn-ink h-9 px-4 text-[13px]">
+                  <button onClick={() => open()} className="btn btn-ink h-9 px-4 text-[13px] yellow-gradient">
                     Connect wallet
                   </button>
                 ) : (
@@ -128,17 +128,17 @@ export default function Header() {
                     {dropdown && (
                       <>
                         <div className="fixed inset-0 z-40" onClick={() => setDropdown(false)} />
-                        <div className="absolute right-0 top-full mt-1.5 w-64 z-50 card shadow-[4px_4px_0_0_#0d0f0c]">
-                          <div className="p-3.5 border-b border-ink/12 flex items-center gap-3">
+                        <div className="absolute right-0 top-full mt-1.5 w-64 z-50 border border-yellow-400/20 bg-gradient-to-b from-yellow-500/5 to-black/40 rounded-xl shadow-2xl shadow-black/50">
+                          <div className="p-3.5 border-b border-yellow-400/20 flex items-center gap-3">
                             <Avatar address={address!} size={32} />
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
-                                <span className="mono text-[12px]">{short}</span>
+                                <span className="mono text-[12px] text-white/80">{short}</span>
                                 <button
                                   onClick={copy}
-                                  className="text-ink-mute hover:text-ink transition-colors cursor-pointer"
+                                  className="text-white/40 hover:text-yellow-300 transition-colors cursor-pointer"
                                 >
-                                  {copied ? <Check size={12} /> : <Copy size={12} />}
+                                  {copied ? <Check size={12} className="text-yellow-300" /> : <Copy size={12} />}
                                 </button>
                               </div>
                               <span className="eyebrow">{activeNetwork.label}</span>
@@ -147,7 +147,7 @@ export default function Header() {
                           <Link
                             to="/portfolio"
                             onClick={() => setDropdown(false)}
-                            className="w-full flex items-center px-3.5 py-2.5 text-[13px] font-medium text-ink-soft hover:bg-ink/[0.04] hover:text-ink transition-colors"
+                            className="w-full flex items-center px-3.5 py-2.5 text-[13px] font-medium text-white/70 hover:bg-yellow-500/5 hover:text-white transition-colors"
                           >
                             My portfolio
                           </Link>
@@ -156,7 +156,7 @@ export default function Header() {
                               disconnect();
                               setDropdown(false);
                             }}
-                            className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] font-medium text-ink-soft hover:text-danger hover:bg-danger/[0.06] transition-colors cursor-pointer border-t border-ink/8"
+                            className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] font-medium text-white/40 hover:text-danger hover:bg-danger/[0.06] transition-colors cursor-pointer border-t border-yellow-400/10"
                           >
                             <LogOut size={13} />
                             Disconnect
@@ -184,12 +184,12 @@ export default function Header() {
 
       {/* ------------------------------------------------ mobile menu --- */}
       <div
-        className={`fixed inset-0 z-40 md:hidden bg-cream transition-opacity duration-200 ${
+        className={`fixed inset-0 z-40 md:hidden bg-black transition-opacity duration-200 ${
           mobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
       >
         <div className="flex flex-col h-full pt-[58px]">
-          <nav className="flex flex-col border-t border-ink/12">
+          <nav className="flex flex-col border-t border-yellow-400/10">
             {NAV_LINKS.map((link, i) => {
               if (link.external) {
                 return (
@@ -199,12 +199,12 @@ export default function Header() {
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => setMobileOpen(false)}
-                    className="flex items-baseline gap-4 px-6 py-6 border-b border-ink/12 text-ink-soft hover:bg-white transition-colors"
+                    className="flex items-baseline gap-4 px-6 py-6 border-b border-yellow-400/10 text-white/60 hover:bg-yellow-500/5 transition-colors"
                   >
-                    <span className="mono text-[10px] text-ink-mute">
+                    <span className="mono text-[10px] text-white/30">
                       {String(i + 1).padStart(2, '0')}
                     </span>
-                    <span className="text-[26px] font-extrabold tracking-[-0.03em]">{link.label}</span>
+                    <span className="text-[26px] font-extrabold tracking-[-0.03em] text-white">{link.label}</span>
                   </a>
                 );
               }
@@ -213,22 +213,22 @@ export default function Header() {
                   key={link.href}
                   to={link.href}
                   onClick={() => setMobileOpen(false)}
-                  className={`flex items-baseline gap-4 px-6 py-6 border-b border-ink/12 transition-colors ${
-                    isActive(link.href) ? 'bg-white text-ink' : 'text-ink-soft hover:bg-white'
+                  className={`flex items-baseline gap-4 px-6 py-6 border-b border-yellow-400/10 transition-colors ${
+                    isActive(link.href) ? 'bg-yellow-500/5 text-white' : 'text-white/60 hover:bg-yellow-500/5'
                   }`}
                 >
-                  <span className="mono text-[10px] text-ink-mute">
+                  <span className="mono text-[10px] text-white/30">
                     {String(i + 1).padStart(2, '0')}
                   </span>
-                  <span className="text-[26px] font-extrabold tracking-[-0.03em]">{link.label}</span>
+                  <span className="text-[26px] font-extrabold tracking-[-0.03em] text-white">{link.label}</span>
                 </Link>
               );
             })}
           </nav>
 
           <div className="mt-auto p-6 space-y-3">
-            <div className="flex items-center gap-1.5 mono text-[10px] uppercase tracking-[0.16em] text-ink-mute">
-              <span className="w-1.5 h-1.5 bg-gem-600" />
+            <div className="flex items-center gap-1.5 mono text-[10px] uppercase tracking-[0.16em] text-white/40">
+              <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
               {activeNetwork.label}
             </div>
             {!isConnected ? (
@@ -237,7 +237,7 @@ export default function Header() {
                   open();
                   setMobileOpen(false);
                 }}
-                className="btn btn-primary w-full h-13 py-4 text-[14px]"
+                className="btn btn-primary w-full h-13 py-4 text-[14px] yellow-gradient"
               >
                 Connect wallet
               </button>

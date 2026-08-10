@@ -22,10 +22,10 @@ import Erc20Abi from '@/abi/ERC20.json';
 /** Square ledger cell — matches the Explore stat strip. */
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="bg-white px-4 py-3.5 flex flex-col justify-between min-w-0">
+    <div className="bg-black px-4 py-3.5 flex flex-col justify-between min-w-0">
       <span className="eyebrow">{label}</span>
-      <p className="num text-[20px] font-semibold leading-none mt-2.5 truncate">{value}</p>
-      {hint && <p className="mono text-[10px] text-ink-mute mt-1.5 truncate">{hint}</p>}
+      <p className="num text-[20px] font-semibold text-yellow-300 leading-none mt-2.5 truncate">{value}</p>
+      {hint && <p className="mono text-[10px] text-white/30 mt-1.5 truncate">{hint}</p>}
     </div>
   );
 }
@@ -103,22 +103,22 @@ export default function TokenDetail() {
 
   if (loading && !launch) {
     return (
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 pt-40 pb-24 flex flex-col items-center gap-3">
-        <Loader2 size={22} className="animate-spin text-ink-mute" />
-        <p className="mono text-[11px] uppercase tracking-[0.16em] text-ink-mute">Loading token</p>
+      <div className="max-w-[1400px] mx-auto px-4 md:px-6 pt-40 pb-24 flex flex-col items-center gap-3 bg-black min-h-screen">
+        <Loader2 size={22} className="animate-spin text-white/20" />
+        <p className="mono text-[11px] uppercase tracking-[0.16em] text-white/30">Loading token</p>
       </div>
     );
   }
 
   if (!launch) {
     return (
-      <div className="max-w-2xl mx-auto px-4 pt-40 pb-24">
-        <div className="card hatch p-14 text-center flex flex-col items-center gap-3">
-          <p className="text-[18px] font-extrabold tracking-tight">Token not found</p>
-          <p className="text-ink-soft text-[14px]">
+      <div className="max-w-2xl mx-auto px-4 pt-40 pb-24 bg-black min-h-screen">
+        <div className="border border-yellow-400/20 bg-gradient-to-b from-yellow-500/5 to-transparent rounded-xl p-14 text-center flex flex-col items-center gap-3">
+          <p className="text-[18px] font-extrabold tracking-tight text-white">Token not found</p>
+          <p className="text-white/70 text-[14px]">
             {error ?? 'This launch does not exist yet.'}
           </p>
-          <Link to="/" className="btn btn-primary h-11 px-6 mt-2">
+          <Link to="/" className="btn btn-primary h-11 px-6 mt-2 yellow-gradient">
             Back to explore
           </Link>
         </div>
@@ -129,20 +129,20 @@ export default function TokenDetail() {
   const links = launch.links ?? {};
 
   return (
-    <div className="pt-[58px]">
+    <div className="pt-[58px] bg-black min-h-screen text-white">
       {/* --------------------------------------------------- title bar -- */}
-      <div className="border-b border-ink/12 bg-white">
+      <div className="border-b border-yellow-400/10 bg-black/40">
         <div className="max-w-[1400px] mx-auto px-4 md:px-6">
           <Link
             to="/"
-            className="inline-flex items-center gap-1.5 mono text-[10px] uppercase tracking-[0.16em] text-ink-mute hover:text-ink transition-colors pt-5"
+            className="inline-flex items-center gap-1.5 mono text-[10px] uppercase tracking-[0.16em] text-white/30 hover:text-yellow-300 transition-colors pt-5"
           >
             <ArrowLeft size={12} />
             All launches
           </Link>
 
           <div className="flex items-start gap-4 md:gap-5 py-5">
-            <div className="w-16 h-16 md:w-20 md:h-20 overflow-hidden bg-gem-100 border border-ink/12 shrink-0 flex items-center justify-center">
+            <div className="w-16 h-16 md:w-20 md:h-20 overflow-hidden border border-white/[0.08] shrink-0 flex items-center justify-center">
               {launch.imageUrl ? (
                 <img
                   src={launch.imageUrl}
@@ -150,7 +150,7 @@ export default function TokenDetail() {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <span className="mono text-gem-800 font-semibold text-lg">
+                <span className="mono text-yellow-300 font-semibold text-lg">
                   {launch.symbol.slice(0, 3).toUpperCase()}
                 </span>
               )}
@@ -158,11 +158,11 @@ export default function TokenDetail() {
 
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2.5 mb-2">
-                <h1 className="display text-[28px] md:text-[38px]">{launch.name}</h1>
-                <span className="mono text-[13px] text-ink-mute">{launch.symbol}</span>
+                <h1 className="display text-[28px] md:text-[38px] text-white">{launch.name}</h1>
+                <span className="mono text-[13px] text-white/40">{launch.symbol}</span>
                 {launch.isLive ? (
                   <span className="chip chip-live">
-                    <span className="w-1 h-1 bg-gem-700 animate-blink" />
+                    <span className="w-1 h-1 rounded-full bg-yellow-300 animate-blink" />
                     Curve open · {countdown(Number(launch.fairLaunchEndsAt))}
                   </span>
                 ) : (
@@ -173,18 +173,18 @@ export default function TokenDetail() {
               <div className="flex flex-wrap items-center gap-1.5">
                 <button
                   onClick={copyAddress}
-                  className="chip hover:border-ink transition-colors cursor-pointer"
+                  className="chip hover:border-yellow-400/30 transition-colors cursor-pointer"
                 >
-                  {copied ? <Check size={11} /> : <Copy size={11} />}
+                  {copied ? <Check size={11} className="text-yellow-300" /> : <Copy size={11} className="text-yellow-300" />}
                   {shortAddress(launch.memecoin, 6)}
                 </button>
                 <a
                   href={explorerAddress(launch.memecoin)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="chip hover:border-ink transition-colors"
+                  className="chip hover:border-yellow-400/30 transition-colors"
                 >
-                  <ExternalLink size={11} />
+                  <ExternalLink size={11} className="text-yellow-300" />
                   Explorer
                 </a>
                 <span className="chip">
@@ -198,9 +198,9 @@ export default function TokenDetail() {
       </div>
 
       {/* ------------------------------------------------- stat ledger -- */}
-      <div className="border-b border-ink/12 bg-ink/[0.04]">
+      <div className="border-b border-yellow-400/10 bg-black/40">
         <div className="max-w-[1400px] mx-auto px-4 md:px-6">
-          <div className="grid grid-cols-2 lg:grid-cols-6 gap-px bg-ink/12 border-x border-ink/12">
+          <div className="grid grid-cols-2 lg:grid-cols-6 gap-px bg-yellow-400/5 border-x border-yellow-400/10">
             <Stat
               label="Volume · 24h"
               value={fmtNative(volume.day.toString())}
@@ -236,17 +236,17 @@ export default function TokenDetail() {
         <div className="grid lg:grid-cols-[1.6fr_1fr] gap-6 items-start">
           {/* ---------------------------------------------------- left */}
           <div className="space-y-5">
-            <div className="card p-5">
+            <div className="border border-white/[0.04] bg-gradient-to-b from-yellow-500/3 to-transparent rounded-xl p-5">
               <div className="flex items-baseline justify-between mb-2">
                 <span className="eyebrow">Curve filled</span>
-                <span className="num text-[13px] font-semibold">{pct.toFixed(2)}%</span>
+                <span className="num text-[13px] font-semibold text-yellow-300">{pct.toFixed(2)}%</span>
               </div>
               <div className={`meter ${launch.isLive ? 'meter-live' : ''}`}>
                 <span style={{ width: `${Math.min(Math.max(pct, 1), 100)}%` }} />
               </div>
 
               {launch.description && (
-                <p className="text-ink-soft text-[14px] leading-relaxed mt-5 pt-5 border-t border-ink/12">
+                <p className="text-white/70 text-[14px] leading-relaxed mt-5 pt-5 border-t border-yellow-400/10">
                   {launch.description}
                 </p>
               )}
@@ -291,46 +291,46 @@ export default function TokenDetail() {
             </div>
 
             {/* --------------------------------------------- trade tape */}
-            <div className="card">
-              <div className="px-5 py-3 border-b border-ink/12 flex items-center justify-between">
-                <h2 className="text-[14px] font-bold tracking-tight">Trade tape</h2>
-                <span className="mono text-[10px] text-ink-mute uppercase tracking-[0.14em]">
+            <div className="border border-white/[0.04] bg-gradient-to-b from-yellow-500/3 to-transparent rounded-xl">
+              <div className="px-5 py-3 border-b border-yellow-400/10 flex items-center justify-between">
+                <h2 className="text-[14px] font-bold tracking-tight text-white">Trade tape</h2>
+                <span className="mono text-[10px] text-white/30 uppercase tracking-[0.14em]">
                   {launch.buys.length} trades
                 </span>
               </div>
 
               {launch.buys.length === 0 ? (
-                <p className="px-5 py-14 text-center text-ink-mute text-[14px]">
+                <p className="px-5 py-14 text-center text-white/50 text-[14px]">
                   No buys yet — be the first.
                 </p>
               ) : (
                 <>
-                  <div className="hidden sm:grid grid-cols-[1fr_1.2fr_1fr_auto] gap-4 px-5 py-2 border-b border-ink/12 bg-ink/[0.02]">
+                  <div className="hidden sm:grid grid-cols-[1fr_1.2fr_1fr_auto] gap-4 px-5 py-2 border-b border-yellow-400/10 bg-yellow-500/5">
                     {['Buyer', 'Received', 'Paid', 'Time'].map((h) => (
-                      <span key={h} className="eyebrow">
+                      <span key={h} className="eyebrow text-white/40">
                         {h}
                       </span>
                     ))}
                   </div>
-                  <div className="divide-y divide-ink/8">
+                  <div className="divide-y divide-yellow-400/5">
                     {launch.buys.map((b) => (
                       <a
                         key={b.id}
                         href={explorerTx(b.transactionHash)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="grid sm:grid-cols-[1fr_1.2fr_1fr_auto] gap-1 sm:gap-4 px-5 py-2.5 hover:bg-gem-50 transition-colors items-baseline"
+                        className="grid sm:grid-cols-[1fr_1.2fr_1fr_auto] gap-1 sm:gap-4 px-5 py-2.5 hover:bg-yellow-500/5 transition-colors items-baseline"
                       >
-                        <span className="mono text-[12px]">{shortAddress(b.buyer, 4)}</span>
-                        <span className="num text-[12px]">
+                        <span className="mono text-[12px] text-white/60">{shortAddress(b.buyer, 4)}</span>
+                        <span className="num text-[12px] text-white">
                           {fmtToken(b.tokensOut)}{' '}
-                          <span className="text-ink-mute">{launch.symbol}</span>
+                          <span className="text-white/40">{launch.symbol}</span>
                         </span>
-                        <span className="num text-[12px] text-gem-700">
+                        <span className="num text-[12px] text-yellow-300">
                           {fmtNative(b.nativeIn)}{' '}
-                          <span className="text-ink-mute">{CONTRACTS.nativeTokenSymbol}</span>
+                          <span className="text-white/40">{CONTRACTS.nativeTokenSymbol}</span>
                         </span>
-                        <span className="mono text-[10px] text-ink-mute sm:text-right">
+                        <span className="mono text-[10px] text-white/30 sm:text-right">
                           {timeAgo(Number(b.timestamp))}
                         </span>
                       </a>
@@ -343,146 +343,165 @@ export default function TokenDetail() {
 
           {/* --------------------------------------------------- right */}
           <div className="lg:sticky lg:top-[74px] space-y-5">
-            <div className="card">
-              <div className="grid grid-cols-2 border-b border-ink/12">
-                {(['buy', 'sell'] as const).map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => {
-                      setSide(s);
-                      setAmount('');
-                      reset();
-                    }}
-                    className={`h-11 text-[13px] font-bold uppercase tracking-[0.1em] transition-colors cursor-pointer ${
-                      side === s
-                        ? s === 'buy'
-                          ? 'bg-gem-300 text-ink'
-                          : 'bg-ink text-gem-50'
-                        : 'text-ink-mute hover:text-ink'
-                    } ${s === 'sell' ? 'border-l border-ink/12' : ''}`}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-
-              <div className="p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="eyebrow">
-                    You pay · {side === 'buy' ? CONTRACTS.nativeTokenSymbol : launch.symbol}
-                  </span>
-                  <button
-                    onClick={() => setAmount(balanceLabel)}
-                    className="mono text-[10px] text-ink-mute hover:text-ink cursor-pointer"
-                  >
-                    BAL{' '}
-                    {Number(balanceLabel).toLocaleString(undefined, { maximumFractionDigits: 4 })}
-                  </button>
-                </div>
-
-                <input
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
-                  placeholder="0.00"
-                  inputMode="decimal"
-                  className="input-field num w-full h-14 px-4 text-[24px] font-semibold mb-2.5"
-                />
-
-                {side === 'buy' && amount && Number(amount) > 0 && launch && (
-                  <div className="mb-3 px-3.5 py-2.5 bg-gem-50 border border-gem-200 rounded-lg flex items-center justify-between">
-                    <span className="eyebrow text-[11px] text-ink-mute">Estimated receive</span>
-                    <span className="num text-[14px] font-bold text-gem-800">
-                      ≈ {fmtToken(
-                        (() => {
-                          const nativeIn = parseUnits(
-                            amount,
-                            CONTRACTS.nativeTokenDecimals
-                          );
-                          const quote = quoteFairLaunchBuy(
-                            {
-                              targetMarketCap: launch.targetMarketCap,
-                              initialTokenFairLaunch: launch.initialTokenFairLaunch,
-                              multiple: launch.multiple,
-                              remainingSupply: launch.remainingSupply,
-                            },
-                            nativeIn
-                          );
-                          return quote.tokensOut.toString();
-                        })()
-                      )} {launch.symbol}
-                    </span>
+            <div className="border border-white/[0.04] bg-gradient-to-b from-yellow-500/3 to-transparent rounded-xl overflow-hidden">
+              {launch.isLive ? (
+                <>
+                  {/* Buy-only trading during fair launch — sell disabled
+                  <div className="grid grid-cols-2 border-b border-yellow-400/10">
+                    {(['buy', 'sell'] as const).map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => {
+                          setSide(s);
+                          setAmount('');
+                          reset();
+                        }}
+                        className={`h-11 text-[13px] font-bold uppercase tracking-[0.1em] transition-colors cursor-pointer ${
+                          side === s
+                            ? s === 'buy'
+                              ? 'bg-yellow-400 text-black'
+                              : 'bg-black text-yellow-300'
+                            : 'text-white/40 hover:text-white'
+                        } ${s === 'sell' ? 'border-l border-yellow-400/10' : ''}`}
+                      >
+                        {s}
+                      </button>
+                    ))}
                   </div>
-                )}
+                  */}
+                  <div className="p-5">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="eyebrow">
+                        You pay · {side === 'buy' ? CONTRACTS.nativeTokenSymbol : launch.symbol}
+                      </span>
+                      <button
+                        onClick={() => setAmount(balanceLabel)}
+                        className="mono text-[10px] text-white/40 hover:text-white cursor-pointer"
+                      >
+                        BAL{' '}
+                        {Number(balanceLabel).toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                      </button>
+                    </div>
 
-                <div className="seg w-full h-8 mb-4">
-                  {['25', '50', '75', '100'].map((p) => (
+                    <input
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                      placeholder="0.00"
+                      inputMode="decimal"
+                      className="input-field num w-full h-14 px-4 text-[24px] font-semibold mb-2.5"
+                    />
+
+                    {side === 'buy' && amount && Number(amount) > 0 && launch && (
+                      <div className="mb-3 px-3.5 py-2.5 bg-yellow-500/10 border border-yellow-400/20 rounded-lg flex items-center justify-between">
+                        <span className="eyebrow text-[11px] text-white/40">Estimated receive</span>
+                        <span className="num text-[14px] font-bold text-yellow-300">
+                          ≈ {fmtToken(
+                            (() => {
+                              const nativeIn = parseUnits(
+                                amount,
+                                CONTRACTS.nativeTokenDecimals
+                              );
+                              const quote = quoteFairLaunchBuy(
+                                {
+                                  targetMarketCap: launch.targetMarketCap,
+                                  initialTokenFairLaunch: launch.initialTokenFairLaunch,
+                                  multiple: launch.multiple,
+                                  remainingSupply: launch.remainingSupply,
+                                },
+                                nativeIn
+                              );
+                              return quote.tokensOut.toString();
+                            })()
+                          )} {launch.symbol}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="seg w-full h-8 mb-4">
+                      {['25', '50', '75', '100'].map((p) => (
+                        <button
+                          key={p}
+                          onClick={() => {
+                            const v = (Number(balanceLabel) * Number(p)) / 100;
+                            setAmount(v ? String(v) : '');
+                          }}
+                          className="flex-1"
+                        >
+                          {p}%
+                        </button>
+                      ))}
+                    </div>
+
                     <button
-                      key={p}
-                      onClick={() => {
-                        const v = (Number(balanceLabel) * Number(p)) / 100;
-                        setAmount(v ? String(v) : '');
-                      }}
-                      className="flex-1"
+                      onClick={onSwap}
+                      disabled={!isConnected || isBusy || !amount}
+                      className="btn w-full py-3.5 text-[14px] yellow-gradient"
                     >
-                      {p}%
+                      {isBusy ? (
+                        <>
+                          <Loader2 size={15} className="animate-spin" />
+                          {step === 'approving'
+                            ? 'Approving…'
+                            : step === 'signing'
+                              ? 'Confirm in wallet…'
+                              : 'Confirming…'}
+                        </>
+                      ) : (
+                        <>
+                          Buy {launch.symbol}
+                        </>
+                      )}
                     </button>
-                  ))}
-                </div>
 
-                <button
-                  onClick={onSwap}
-                  disabled={!isConnected || isBusy || !amount}
-                  className={`btn w-full py-3.5 text-[14px] ${
-                    side === 'buy' ? 'btn-accent' : 'btn-ink'
-                  }`}
-                >
-                  {isBusy ? (
-                    <>
-                      <Loader2 size={15} className="animate-spin" />
-                      {step === 'approving'
-                        ? 'Approving…'
-                        : step === 'signing'
-                          ? 'Confirm in wallet…'
-                          : 'Confirming…'}
-                    </>
-                  ) : (
-                    <>
-                      {side === 'buy' ? 'Buy' : 'Sell'} {launch.symbol}
-                    </>
-                  )}
-                </button>
+                    {!isConnected && (
+                      <p className="mono text-[10px] uppercase tracking-[0.14em] text-white/40 text-center mt-3">
+                        Connect a wallet to buy
+                      </p>
+                    )}
 
-                {!isConnected && (
-                  <p className="mono text-[10px] uppercase tracking-[0.14em] text-ink-mute text-center mt-3">
-                    Connect a wallet to trade
+                    {swapError && (
+                      <p className="mt-3 mono text-[11px] text-danger break-words leading-relaxed">
+                        {swapError}
+                      </p>
+                    )}
+
+                    {step === 'done' && txHash && (
+                      <a
+                        href={explorerTx(txHash)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-3 flex items-center justify-center gap-1.5 mono text-[11px] text-yellow-300 hover:text-yellow-200"
+                      >
+                        <Check size={12} className="text-yellow-300" />
+                        Trade confirmed — view tx
+                      </a>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="p-6 flex flex-col items-center text-center">
+                  <span className="chip chip-ink mb-4">Trading live</span>
+                  <p className="text-white/70 text-[14px] max-w-[42ch] mb-4">
+                    This token has graduated from the fair launch curve and is now trading on MLSwap.
                   </p>
-                )}
-
-                {swapError && (
-                  <p className="mt-3 mono text-[11px] text-danger break-words leading-relaxed">
-                    {swapError}
-                  </p>
-                )}
-
-                {step === 'done' && txHash && (
                   <a
-                    href={explorerTx(txHash)}
+                    href={`https://app.mlswapx.xyz/pools/${launch.poolId}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-3 flex items-center justify-center gap-1.5 mono text-[11px] text-gem-700 hover:text-gem-800"
+                    className="btn btn-primary h-12 px-6 text-[14px] yellow-gradient inline-flex items-center gap-2"
                   >
-                    <Check size={12} />
-                    Trade confirmed — view tx
+                    Trade on MLSwap
+                    <ExternalLink size={15} />
                   </a>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
-            <div className="card">
-              <div className="px-5 py-3 border-b border-ink/12">
-                <h3 className="text-[14px] font-bold tracking-tight">Launch details & parameters</h3>
+            <div className="border border-white/[0.04] bg-gradient-to-b from-yellow-500/3 to-transparent rounded-xl overflow-hidden">
+              <div className="px-5 py-3 border-b border-yellow-400/10">
+                <h3 className="text-[14px] font-bold tracking-tight text-white">Launch details & parameters</h3>
               </div>
-              <div className="divide-y divide-ink/8">
+              <div className="divide-y divide-yellow-400/5">
                 {[
                   ['Fair launch supply', fmtToken(launch.initialTokenFairLaunch)],
                   ['Duration', `${(Number(launch.fairLaunchDuration) / 3600).toFixed(2)} hours`],
@@ -506,8 +525,8 @@ export default function TokenDetail() {
                   ['Status', launch.fairLaunchClosed ? 'Closed' : launch.isLive ? 'Live' : 'Ended'],
                 ].map(([k, v]) => (
                   <div key={k} className="flex items-baseline justify-between px-5 py-2.5">
-                    <span className="text-[13px] text-ink-mute">{k}</span>
-                    <span className="num text-[13px] font-semibold">{v}</span>
+                    <span className="text-[13px] text-white/40">{k}</span>
+                    <span className="num text-[13px] font-semibold text-white">{v}</span>
                   </div>
                 ))}
               </div>

@@ -62,8 +62,8 @@ function Field({
   return (
     <label className="block">
       <div className="flex items-baseline justify-between mb-2 gap-3">
-        <span className="eyebrow">{label}</span>
-        {hint && <span className="mono text-[10px] text-ink-mute">{hint}</span>}
+        <span className="eyebrow text-white/50">{label}</span>
+        {hint && <span className="mono text-[10px] text-white/40">{hint}</span>}
       </div>
       {children}
     </label>
@@ -73,10 +73,10 @@ function Field({
 /** A numbered section header, like a spec sheet. */
 function Section({ n, title, children }: { n: string; title: string; children: React.ReactNode }) {
   return (
-    <section className="border-t border-ink/12 pt-6">
+    <section className="border-t border-yellow-400/10 pt-6">
       <div className="flex items-baseline gap-3 mb-5">
-        <span className="mono text-[10px] text-ink-mute">{n}</span>
-        <h2 className="text-[15px] font-bold tracking-tight">{title}</h2>
+        <span className="mono text-[10px] text-white/40">{n}</span>
+        <h2 className="text-[15px] font-bold tracking-tight text-white">{title}</h2>
       </div>
       <div className="space-y-5">{children}</div>
     </section>
@@ -236,19 +236,19 @@ export default function LaunchToken() {
   if (step === 'done' && result) {
     return (
       <div className="max-w-xl mx-auto px-4 pt-32 pb-24">
-        <div className="card">
-          <div className="hatch border-b border-ink/12 px-8 py-8 text-center">
-            <div className="w-12 h-12 mx-auto bg-ink flex items-center justify-center mb-5">
-              <Check size={24} className="text-gem-300" strokeWidth={3} />
+        <div className="border border-yellow-400/20 bg-gradient-to-b from-yellow-500/5 to-transparent rounded-xl">
+          <div className="hatch border-b border-yellow-400/20 px-8 py-8 text-center">
+            <div className="w-12 h-12 mx-auto bg-yellow-400 flex items-center justify-center mb-5">
+              <Check size={24} className="text-black" strokeWidth={3} />
             </div>
             <span className="eyebrow">Launch confirmed</span>
-            <h2 className="display text-[34px] mt-3">{form.symbol.toUpperCase()} is live</h2>
-            <p className="text-ink-soft text-[14px] mt-3 max-w-[40ch] mx-auto">
+            <h2 className="display text-[34px] mt-3 text-white">{form.symbol.toUpperCase()} is live</h2>
+            <p className="text-white/70 text-[14px] mt-3 max-w-[40ch] mx-auto">
               Your fair launch has started. The subgraph will index it in a few blocks.
             </p>
           </div>
 
-          <div className="divide-y divide-ink/8">
+          <div className="divide-y divide-yellow-400/10">
             {[
               ['Token', result.memecoin, explorerAddress(result.memecoin)],
               ['Transaction', result.txHash, explorerTx(result.txHash)],
@@ -259,7 +259,7 @@ export default function LaunchToken() {
                   href={href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mono text-[12px] text-ink hover:text-gem-700 flex items-center gap-1.5"
+                  className="mono text-[12px] text-yellow-300 hover:text-yellow-200 flex items-center gap-1.5"
                 >
                   {shortAddress(value, 6)}
                   <ExternalLink size={11} />
@@ -268,10 +268,10 @@ export default function LaunchToken() {
             ))}
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-px bg-ink/12 border-t border-ink/12">
+          <div className="grid sm:grid-cols-2 gap-px bg-yellow-400/5 border-t border-yellow-400/20">
             <Link
               to={`/token/${result.memecoin}`}
-              className="btn btn-primary py-3.5 !border-0 text-[14px]"
+              className="btn btn-primary py-3.5 !border-0 text-[14px] yellow-gradient"
             >
               View token page
             </Link>
@@ -294,24 +294,24 @@ export default function LaunchToken() {
 
   /* --------------------------------------------------------- form ---- */
   return (
-    <div className="pt-[58px]">
-      <div className="border-b border-ink/12 bg-white">
+    <div className="pt-[58px] min-h-screen bg-black text-white">
+      <div className="border-b border-yellow-400/10 bg-black/40">
         <div className="max-w-[820px] mx-auto px-4 md:px-6 py-10">
           <span className="eyebrow">New launch · {activeNetwork.label}</span>
-          <h1 className="display text-[38px] md:text-[52px] mt-4">Launch your memecoin</h1>
-          <p className="text-ink-soft text-[15px] mt-4 max-w-[50ch] leading-relaxed">
+          <h1 className="display text-[38px] md:text-[52px] mt-4 text-white">Launch your memecoin</h1>
+          <p className="text-white/70 text-[15px] mt-4 max-w-[50ch] leading-relaxed">
             Bonding-curve fair launch, automatic bid wall and creator fees. Launch fee is 10 USDC.
           </p>
         </div>
       </div>
 
       <div className="max-w-[820px] mx-auto px-4 md:px-6 py-8">
-        <form onSubmit={handleInitialSubmit} className="card p-6 md:p-8 space-y-6">
+        <form onSubmit={handleInitialSubmit} className="border border-white/[0.04] bg-gradient-to-b from-yellow-500/3 to-transparent rounded-xl p-6 md:p-8 space-y-6">
           {/* -------------------------------------------------- identity */}
           <section>
             <div className="flex items-baseline gap-3 mb-5">
-              <span className="mono text-[10px] text-ink-mute">01</span>
-              <h2 className="text-[15px] font-bold tracking-tight">Identity</h2>
+              <span className="mono text-[10px] text-white/30">01</span>
+              <h2 className="text-[15px] font-bold tracking-tight text-white">Identity</h2>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-5">
@@ -324,7 +324,7 @@ export default function LaunchToken() {
                   onChange={(e) => onPickImage(e.target.files?.[0])}
                 />
                 {preview ? (
-                  <div className="relative w-28 h-28 border border-ink">
+                  <div className="relative w-28 h-28 border border-yellow-400">
                     <img src={preview} alt="preview" className="w-full h-full object-cover" />
                     <button
                       type="button"
@@ -333,7 +333,7 @@ export default function LaunchToken() {
                         setPreview(null);
                         if (fileRef.current) fileRef.current.value = '';
                       }}
-                      className="absolute top-0 right-0 w-6 h-6 bg-ink text-gem-50 flex items-center justify-center hover:bg-danger cursor-pointer"
+                      className="absolute top-0 right-0 w-6 h-6 bg-yellow-400 text-black flex items-center justify-center hover:bg-yellow-300 transition-colors cursor-pointer"
                     >
                       <X size={12} />
                     </button>
@@ -347,9 +347,9 @@ export default function LaunchToken() {
                       e.preventDefault();
                       onPickImage(e.dataTransfer.files?.[0]);
                     }}
-                    className="w-28 h-28 border border-dashed border-ink/30 hatch flex flex-col items-center justify-center gap-1.5 text-ink-mute hover:text-ink hover:border-ink transition-colors cursor-pointer"
+                    className="w-28 h-28 border border-dashed border-yellow-400/40 bg-yellow-500/5 flex flex-col items-center justify-center gap-1.5 text-white/60 hover:text-white hover:border-yellow-400 transition-colors cursor-pointer"
                   >
-                    <ImagePlus size={20} />
+                    <ImagePlus size={20} className="text-yellow-300" />
                     <span className="mono text-[10px] uppercase tracking-[0.14em]">Image</span>
                   </button>
                 )}
@@ -400,28 +400,14 @@ export default function LaunchToken() {
                     onChange={(e) => set('fairLaunchPercent', Number(e.target.value.replace(/[^0-9.]/g, '')))}
                     className="input-field num w-full h-11 pl-3.5 pr-9 text-[15px]"
                   />
-                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 mono text-[12px] text-ink-mute">
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 mono text-[12px] text-yellow-300">
                     %
                   </span>
                 </div>
               </Field>
             </div>
 
-            {/* Premine disabled — not implemented in contract
-            <Field label="Premine" hint="% of fair launch supply, optional">
-              <div className="relative">
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={form.preminePercent}
-                  onChange={(e) => set('preminePercent', Number(e.target.value.replace(/[^0-9.]/g, '')))}
-                  className="input-field num w-full h-11 pl-3.5 pr-9 text-[15px]"
-                />
-                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 mono text-[12px] text-ink-mute">
-                  %
-                </span>
-              </div>
-            </Field> */}
+            {/* Premine disabled — not implemented in contract */}
           </Section>
 
           {/* ------------------------------------------------ the curve */}
@@ -449,13 +435,13 @@ export default function LaunchToken() {
                   onChange={(e) => set('targetMarketCap', e.target.value.replace(/[^0-9.]/g, ''))}
                   className="input-field num w-full h-11 px-3.5 text-[15px]"
                 />
-                <p className="mt-2 mono text-[11px] text-ink/70 flex items-baseline justify-between">
-                  <span className="text-ink-mute">Expected raise</span>
-                  <span className="font-semibold">
+                <p className="mt-2 mono text-[11px] text-white/40 flex items-baseline justify-between">
+                  <span className="text-white/50">Expected raise</span>
+                  <span className="font-semibold text-yellow-300">
                     {expectedRaise !== null
                       ? `$${expectedRaise.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
                       : '—'}{' '}
-                    <span className="text-ink-mute font-normal">{CONTRACTS.nativeTokenSymbol}</span>
+                    <span className="text-white/40 font-normal">{CONTRACTS.nativeTokenSymbol}</span>
                   </span>
                 </p>
               </Field>
@@ -473,8 +459,8 @@ export default function LaunchToken() {
                         }}
                         className={`h-9 rounded border mono text-[12px] font-semibold transition-all ${
                           form.multiple === m && !customMultiple
-                            ? 'bg-ink text-gem-50 border-ink'
-                            : 'bg-white/50 text-ink/70 border-ink/20 hover:border-ink/40'
+                            ? 'bg-yellow-400 text-black border-yellow-400'
+                            : 'bg-white/[0.03] text-white/40 border-white/[0.06] hover:border-yellow-400/30'
                         }`}
                       >
                         {m}x
@@ -489,10 +475,10 @@ export default function LaunchToken() {
                       onChange={(e) => onCustomMultipleChange(e.target.value.replace(/[^0-9.]/g, ''))}
                       placeholder="Custom multiple (e.g. 15)"
                       className={`input-field num w-full h-10 pl-3.5 pr-8 text-[13px] ${
-                        customMultiple ? 'border-ink' : ''
+                        customMultiple ? 'border-yellow-400' : ''
                       }`}
                     />
-                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 mono text-[11px] text-ink-mute">
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 mono text-[11px] text-yellow-300">
                       x
                     </span>
                   </div>
@@ -512,7 +498,7 @@ export default function LaunchToken() {
                   onChange={(e) => set('creatorFeeAllocationPercent', Number(e.target.value.replace(/[^0-9.]/g, '')))}
                   className="input-field num w-full h-11 pl-3.5 pr-9 text-[15px]"
                 />
-                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 mono text-[12px] text-ink-mute">
+                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 mono text-[12px] text-yellow-300">
                   %
                 </span>
               </div>
@@ -520,7 +506,7 @@ export default function LaunchToken() {
           </Section>
 
           {/* --------------------------------------------------- submit */}
-          <div className="border-t border-ink/12 pt-6 space-y-3">
+          <div className="border-t border-yellow-400/10 pt-6 space-y-3">
             {error && (
               <div className="flex items-start gap-2.5 px-3.5 py-3 border border-danger/40 bg-danger/[0.05]">
                 <AlertTriangle size={15} className="text-danger shrink-0 mt-0.5" />
@@ -529,7 +515,7 @@ export default function LaunchToken() {
             )}
 
             {!valid && Object.keys(errors).length > 0 && (
-              <p className="mono text-[10px] uppercase tracking-[0.14em] text-ink-mute">
+              <p className="mono text-[10px] uppercase tracking-[0.14em] text-white/50">
                 {Object.values(errors)[0]}
               </p>
             )}
@@ -537,13 +523,13 @@ export default function LaunchToken() {
             <button
               type="submit"
               disabled={isBusy || (isConnected && !valid)}
-              className="btn btn-primary w-full py-4 text-[15px]"
+              className="btn btn-primary w-full py-4 text-[15px] yellow-gradient"
             >
               {isBusy && <Loader2 size={16} className="animate-spin" />}
               {isConnected ? stepLabel : 'Connect wallet to launch'}
             </button>
 
-            <p className="mono text-[10px] uppercase tracking-[0.14em] text-ink-mute text-center">
+            <p className="mono text-[10px] uppercase tracking-[0.14em] text-white/40 text-center">
               Launch fee is 10 USDC + gas on {activeNetwork.label}
             </p>
           </div>
@@ -553,9 +539,9 @@ export default function LaunchToken() {
       {/* ------------------------------------------- Confirmation Modal */}
       {showConfirmModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-[#111111] border border-white/15 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-6 text-white">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <h3 className="text-lg font-bold">Review Token Launch Details</h3>
+          <div className="border border-yellow-400/20 bg-gradient-to-b from-yellow-500/5 to-black/40 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-6 text-white">
+            <div className="flex items-center justify-between border-b border-yellow-400/20 pb-4">
+              <h3 className="text-lg font-bold text-white">Review Token Launch Details</h3>
               <button
                 onClick={() => setShowConfirmModal(false)}
                 className="text-white/40 hover:text-white transition-colors"
@@ -565,61 +551,34 @@ export default function LaunchToken() {
             </div>
 
             <div className="space-y-3 text-sm font-mono">
-              <div className="flex justify-between py-1 border-b border-white/5">
-                <span className="text-white/50">Token Name</span>
-                <span className="font-semibold text-white">{form.name}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-white/5">
-                <span className="text-white/50">Ticker</span>
-                <span className="font-semibold text-white">{form.symbol}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-white/5">
-                <span className="text-white/50">Total Supply</span>
-                <span className="text-white">{Number(form.totalSupply).toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-white/5">
-                <span className="text-white/50">Fair Launch Supply</span>
-                <span className="text-white">{form.fairLaunchPercent}%</span>
-              </div>
-              {/* Premine disabled — not implemented in contract
-              <div className="flex justify-between py-1 border-b border-white/5">
-                <span className="text-white/50">Premine (% of Fairlaunch)</span>
-                <span className="text-white">{form.preminePercent}%</span>
-              </div> */}
-              <div className="flex justify-between py-1 border-b border-white/5">
-                <span className="text-white/50">Fair Launch Duration</span>
-                <span className="text-white">{formatDuration(form.fairLaunchDuration)}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-white/5">
-                <span className="text-white/50">Launch Start (launchAt)</span>
-                <span className="text-white">
-                  {form.startsInSeconds > 0
+              {[
+                ['Token Name', form.name, null],
+                ['Ticker', form.symbol, null],
+                ['Total Supply', Number(form.totalSupply).toLocaleString(), null],
+                ['Fair Launch Supply', `${form.fairLaunchPercent}%`, null],
+                ['Fair Launch Duration', formatDuration(form.fairLaunchDuration), null],
+                [
+                  'Launch Start (launchAt)',
+                  form.startsInSeconds > 0
                     ? `Starts in ${formatDuration(form.startsInSeconds)}`
-                    : 'Immediately'}
-                </span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-white/5">
-                <span className="text-white/50">Target Market Cap</span>
-                <span className="text-white">${Number(form.targetMarketCap).toLocaleString()} USDC</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-white/5">
-                <span className="text-white/50">Expected Raise</span>
-                <span className="text-white">
-                  {expectedRaise !== null
-                    ? `$${expectedRaise.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
-                    : '—'}{' '}
-                  USDC
-                </span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-white/5">
-                <span className="text-white/50">Curve Multiple</span>
-                <span className="text-white">{form.multiple}x</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-white/5">
-                <span className="text-white/50">Creator Fee Share</span>
-                <span className="text-white">{form.creatorFeeAllocationPercent}%</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-white/5 text-primary">
+                    : 'Immediately',
+                  null,
+                ],
+                ['Target Market Cap', `$${Number(form.targetMarketCap).toLocaleString()} USDC`, null],
+                ['Expected Raise',
+                  expectedRaise !== null
+                    ? `$${expectedRaise.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDC`
+                    : '—',
+                  null],
+                ['Curve Multiple', `${form.multiple}x`, null],
+                ['Creator Fee Share', `${form.creatorFeeAllocationPercent}%`, null],
+              ].map(([label, value]) => (
+                <div key={label} className="flex justify-between py-1 border-b border-white/[0.05]">
+                  <span className="text-white/50">{label}</span>
+                  <span className="font-semibold text-white">{value}</span>
+                </div>
+              ))}
+              <div className="flex justify-between py-1 border-b border-white/[0.05] text-yellow-300">
                 <span>Launch Fee</span>
                 <span className="font-bold">10 USDC</span>
               </div>
@@ -633,14 +592,14 @@ export default function LaunchToken() {
               <button
                 type="button"
                 onClick={() => setShowConfirmModal(false)}
-                className="flex-1 py-3 border border-white/20 rounded-xl text-sm font-medium hover:bg-white/5 transition-colors"
+                className="flex-1 py-3 border border-white/[0.08] rounded-lg text-sm font-medium text-white/70 hover:bg-white/[0.05] transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleConfirmLaunch}
-                className="flex-1 py-3 bg-primary text-black font-semibold rounded-xl text-sm hover:brightness-110 transition-all"
+                className="flex-1 py-3 bg-yellow-400 text-black font-semibold rounded-lg text-sm hover:brightness-110 transition-all yellow-gradient"
               >
                 Confirm & Launch
               </button>
