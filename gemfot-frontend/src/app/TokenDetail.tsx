@@ -485,7 +485,7 @@ export default function TokenDetail() {
                     This token has graduated from the fair launch curve and is now trading on MLSwap.
                   </p>
                   <a
-                    href={`https://app.mlswapx.xyz/pools/${BigInt(launch.poolId).toString()}`}
+                    href={`https://app.mlswapx.xyz/pools/${launch.poolId}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="btn btn-primary h-12 px-6 text-[14px] yellow-gradient inline-flex items-center gap-2"
