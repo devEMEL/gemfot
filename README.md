@@ -2,7 +2,8 @@
 
 **Fair-launch memecoin protocol on Arc (Uniswap V4).**
 
-GemFot is a Uniswap V4 hook that takes a memecoin from idea to token launch to live trading — all in one on-chain flow. It pairs a **bonding-curve fair launch** with a built-in **BidWall** (plunge protection) so creators launch fairly and holders get price stability on day one.
+GemFot is a Uniswap V4 hook that takes a memecoin from idea to token launch to live trading. It pairs a bonding-curve fair launch with automated liquidity provisioning so that when the fair launch curve completes, USDC raised becomes permanent liquidity. Additionally, a BidWall provides plunge protection during trading by placing single-sided bids one tick below spot. It automatically rebalances when threshold conditions are met, catching falling prices and preventing cascading dumps.
+
 
 ## Core concept
 
@@ -111,7 +112,7 @@ Entities: `Protocol`, `Creator`, `Launch`, `Swap`, `FairLaunchBuy`.
 | `initialTokenFairLaunch` | Tokens on the bonding curve |
 | `fairLaunchDuration` | Seconds the curve stays open |
 | `premineAmount` | Creator buys early at `p0` |
-| `creatorFeeAllocation` | % of BidWall fees the creator keeps (0–100) |
+| `creatorFeeAllocation` | % of swap fees the creator keeps (0–100) |
 | `launchAt` | Optional delayed launch timestamp |
 | `totalSupply` | Full ERC20 supply |
 | `usdcMarketCap` | Target market cap at curve completion |

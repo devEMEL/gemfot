@@ -1,6 +1,14 @@
-flayGovernance The $FLAY token governance address 
+Cascading refers to a price drop that feeds on itself - as the price falls, it triggers more selling (panic selling), which causes the price to fall even further, which triggers more selling, creating a chain reaction or "cascade" of downward movement.
 
-check how we have used flayGovernance in the code (how governance works ).
+In crypto, this often looks like: price drops below a key level → stop-losses trigger → more selling pressure → price drops further → more panic selling → continued downward spiral.
+
+The BidWall is designed to interrupt this cascade by placing buy orders (liquidity) one tick below spot price, acting as a "circuit breaker" that absorbs selling pressure before it can cascade further down the price curve.f
+
+
+
+layGovernance The $FLAY token governance address 
+
+check how we have used flayGovernance in the code (how governance works).
 
 
 
