@@ -2,6 +2,7 @@
 
 ## 1 — Problem
 
+
 Memecoin launches today are a minefield:
 
 - **Rug-pull risk** — creators can mint + dump with zero skin in the game
