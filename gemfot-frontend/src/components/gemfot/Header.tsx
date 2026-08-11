@@ -267,7 +267,7 @@ export default function Header() {
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => setMobileOpen(false)}
-                    className="px-4 py-3.5 text-[18px] font-bold text-black/50 hover:text-black rounded-2xl hover:bg-black/[0.03] transition-colors"
+                    className="px-4 py-3.5 text-[18px] font-bold font-raleway text-black/50 hover:text-black rounded-2xl hover:bg-black/[0.03] transition-colors"
                   >
                     {link.label}
                   </a>
@@ -278,7 +278,7 @@ export default function Header() {
                   key={link.href}
                   to={link.href}
                   onClick={() => setMobileOpen(false)}
-                  className={`px-4 py-3.5 text-[18px] font-bold rounded-2xl transition-colors ${
+                  className={`px-4 py-3.5 text-[18px] font-bold font-raleway rounded-2xl transition-colors ${
                     isActive(link.href)
                       ? 'text-[#f60aa8] bg-[rgba(246,10,168,0.12)]'
                       : 'text-black/50 hover:text-black hover:bg-black/[0.03]'
