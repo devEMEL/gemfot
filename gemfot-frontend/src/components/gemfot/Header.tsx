@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAppKit } from '@reown/appkit/react';
-import { useAccount, useDisconnect } from 'wagmi';
+import { useAccount, useDisconnect, useReadContract } from 'wagmi';
+import { formatUnits } from 'viem';
 import { Menu, X, LogOut, Copy, Check, ChevronDown } from 'lucide-react';
 import { Logo } from './Logo';
-import { activeNetwork } from '@/config/networks';
+import { activeNetwork, CONTRACTS } from '@/config/networks';
+import Erc20Abi from '@/abi/ERC20.json';
 
 interface NavLinkItem {
   label: string;
@@ -14,21 +16,21 @@ interface NavLinkItem {
 
 const NAV_LINKS: NavLinkItem[] = [
   { label: 'Explore', href: '/' },
-  { label: 'Launch', href: '/launch' },
   { label: 'Portfolio', href: '/portfolio' },
   { label: 'Faucet', href: 'https://app.mlswapx.xyz/faucet', external: true },
+  { label: 'Launch', href: '/launch' },
 ];
 
-function Avatar({ address, size = 22 }: { address: string; size?: number }) {
+function Avatar({ address, size = 28 }: { address: string; size?: number }) {
   const seed = parseInt(address.slice(2, 10) || '0', 16);
-  const hue = 70 + (seed % 60);
+  const hue = (seed % 360);
   return (
     <span
-      className="shrink-0 border border-ink/20"
+      className="shrink-0 rounded-full"
       style={{
         width: size,
         height: size,
-        background: `linear-gradient(135deg, hsl(${hue} 70% 62%), hsl(${(hue + 45) % 360} 65% 42%))`,
+        background: `linear-gradient(135deg, hsl(${hue} 80% 60%), hsl(${(hue + 80) % 360} 70% 50%))`,
       }}
     />
   );
@@ -39,12 +41,42 @@ export default function Header() {
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const { pathname } = useLocation();
+  // Header search disabled — Explore page search is enough
+  // const navigate = useNavigate();
+  // const [searchParams] = useSearchParams();
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [dropdown, setDropdown] = useState(false);
   const [copied, setCopied] = useState(false);
+  // const [query, setQuery] = useState(() => searchParams.get('q') ?? '');
 
-  const short = address ? `${address.slice(0, 6)}…${address.slice(-4)}` : '';
+  // useEffect(() => {
+  //   setQuery(searchParams.get('q') ?? '');
+  // }, [searchParams]);
+
+  // const onSearch = (value: string) => {
+  //   setQuery(value);
+  //   const params = new URLSearchParams();
+  //   if (value.trim()) params.set('q', value.trim());
+  //   const qs = params.toString();
+  //   navigate(qs ? `/?${qs}` : '/', { replace: pathname === '/' });
+  // };
+
+  const { data: usdcBalance } = useReadContract({
+    address: CONTRACTS.nativeToken,
+    abi: (Erc20Abi as any).abi || Erc20Abi,
+    functionName: 'balanceOf',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address, refetchInterval: 15_000 },
+  });
+
+  const short = address ? `${address.slice(0, 4)}…${address.slice(-4)}` : '';
+  const bal = usdcBalance
+    ? Number(formatUnits(usdcBalance as bigint, CONTRACTS.nativeTokenDecimals)).toLocaleString(
+        undefined,
+        { maximumFractionDigits: 2 }
+      )
+    : '0.00';
 
   const copy = () => {
     if (!address) return;
@@ -58,14 +90,13 @@ export default function Header() {
 
   return (
     <>
-      <header className="fixed top-0 inset-x-0 z-50 bg-black/92 backdrop-blur-md border-b border-yellow-400/10">
+      <header className="fixed top-0 inset-x-0 z-50 bg-white/80 backdrop-blur-xl border-b border-black/[0.06]">
         <div className="max-w-[1400px] mx-auto px-4 md:px-6">
-          <div className="h-[58px] flex items-center justify-between gap-6">
-            {/* ------------------------------------------------- left --- */}
-            <div className="flex items-center gap-7 min-w-0">
+          <div className="h-[64px] flex items-center justify-between gap-4">
+            <div className="flex items-center gap-6 min-w-0">
               <Logo />
 
-              <nav className="hidden md:flex items-center gap-8">
+              <nav className="hidden md:flex items-center gap-1">
                 {NAV_LINKS.map((link) => {
                   const active = !link.external && isActive(link.href);
                   if (link.external) {
@@ -75,79 +106,119 @@ export default function Header() {
                         href={link.href}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="relative text-[17px] font-semibold tracking-tight text-white/40 hover:text-white transition-colors py-[19px]"
+                        className="px-3.5 py-2 text-[14px] font-semibold text-black/45 hover:text-black transition-colors rounded-full"
                       >
                         {link.label}
                       </a>
+                    );
+                  }
+                  if (link.href === '/launch') {
+                    return (
+                      <Link
+                        key={link.href}
+                        to={link.href}
+                        className="btn btn-primary h-9 px-4 text-[13px] ml-1"
+                      >
+                        {link.label}
+                      </Link>
                     );
                   }
                   return (
                     <Link
                       key={link.href}
                       to={link.href}
-                      className={`relative text-[17px] font-semibold tracking-tight transition-colors py-[19px] ${
-                        active ? 'text-white' : 'text-white/40 hover:text-white'
+                      className={`px-3.5 py-2 text-[14px] font-semibold rounded-full transition-colors ${
+                        active
+                          ? 'text-black bg-black/[0.05]'
+                          : 'text-black/45 hover:text-black hover:bg-black/[0.03]'
                       }`}
                     >
                       {link.label}
-                      {active && (
-                        <span className="absolute left-0 right-0 -bottom-px h-[2px] bg-yellow-400" />
-                      )}
                     </Link>
                   );
                 })}
               </nav>
             </div>
 
-            {/* ------------------------------------------------ right --- */}
+            {/* Center search — desktop (disabled; Explore page search is enough)
+            <div className="hidden lg:flex relative z-10 flex-1 max-w-md mx-4">
+              <Search
+                size={15}
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black/35 pointer-events-none"
+              />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => onSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    onSearch(query);
+                    document.getElementById('launches')?.scrollIntoView({ behavior: 'smooth' });
+                  }
+                }}
+                placeholder="Search coins, CA, creators"
+                className="w-full h-10 pl-9 pr-4 rounded-full bg-[#f4f5f7] text-[13px] font-medium text-black placeholder:text-black/40 border border-transparent focus:outline-none focus:bg-white focus:border-[#f60aa8]/35 focus:shadow-[0_0_0_3px_rgba(246,10,168,0.1)] transition-all"
+              />
+            </div>
+            */}
+
             <div className="flex items-center gap-2.5">
-              <div className="hidden lg:flex items-center gap-1.5 mono text-[10px] uppercase tracking-[0.16em] text-white/40">
-                <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-blink" />
+              <div className="hidden lg:flex items-center gap-1.5 text-[12px] font-semibold text-black/35">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e]" />
                 {activeNetwork.label}
               </div>
 
               <div className="hidden md:block relative">
                 {!isConnected ? (
-                  <button onClick={() => open()} className="btn btn-ink h-9 px-4 text-[13px] yellow-gradient">
-                    Connect wallet
+                  <button
+                    onClick={() => open()}
+                    className="h-10 px-4 text-[13px] font-bold rounded-full bg-black text-white hover:bg-black/85 transition-colors cursor-pointer"
+                  >
+                    Connect
                   </button>
                 ) : (
                   <>
                     <button
                       onClick={() => setDropdown((v) => !v)}
-                      className="btn btn-soft h-9 pl-2 pr-3 gap-2 text-[13px]"
+                      className="flex items-center gap-2 h-10 pl-1.5 pr-3 rounded-full bg-[#f4f5f7] hover:bg-[#eef0f3] transition-colors cursor-pointer border border-black/[0.06]"
                     >
                       <Avatar address={address!} />
-                      <span className="mono text-[12px]">{short}</span>
+                      <div className="flex flex-col items-start leading-none gap-0.5">
+                        <span className="text-[12px] font-bold text-black">{short}</span>
+                        <span className="text-[10px] font-semibold text-black/40">
+                          ${bal}
+                        </span>
+                      </div>
                       <ChevronDown
                         size={13}
-                        className={`transition-transform ${dropdown ? 'rotate-180' : ''}`}
+                        className={`text-black/30 transition-transform ${dropdown ? 'rotate-180' : ''}`}
                       />
                     </button>
 
                     {dropdown && (
                       <>
                         <div className="fixed inset-0 z-40" onClick={() => setDropdown(false)} />
-                        <div className="absolute right-0 top-full mt-1.5 w-64 z-50 border border-yellow-400/20 bg-gradient-to-b from-yellow-500/5 to-black/40 rounded-xl shadow-2xl shadow-black/50">
-                          <div className="p-3.5 border-b border-yellow-400/20 flex items-center gap-3">
-                            <Avatar address={address!} size={32} />
+                        <div className="absolute right-0 top-full mt-2 w-64 z-50 bg-white rounded-2xl shadow-[0_12px_40px_rgba(15,17,21,0.12)] border border-black/[0.06] overflow-hidden">
+                          <div className="p-3.5 border-b border-black/[0.06] flex items-center gap-3">
+                            <Avatar address={address!} size={36} />
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
-                                <span className="mono text-[12px] text-white/80">{short}</span>
+                                <span className="text-[13px] font-bold text-black">{short}</span>
                                 <button
                                   onClick={copy}
-                                  className="text-white/40 hover:text-yellow-300 transition-colors cursor-pointer"
+                                  className="text-black/30 hover:text-[#f60aa8] transition-colors cursor-pointer"
                                 >
-                                  {copied ? <Check size={12} className="text-yellow-300" /> : <Copy size={12} />}
+                                  {copied ? <Check size={12} className="text-[#f60aa8]" /> : <Copy size={12} />}
                                 </button>
                               </div>
-                              <span className="eyebrow">{activeNetwork.label}</span>
+                              <span className="text-[11px] text-black/40 font-medium">{activeNetwork.label}</span>
                             </div>
                           </div>
                           <Link
                             to="/portfolio"
                             onClick={() => setDropdown(false)}
-                            className="w-full flex items-center px-3.5 py-2.5 text-[13px] font-medium text-white/70 hover:bg-yellow-500/5 hover:text-white transition-colors"
+                            className="w-full flex items-center px-3.5 py-3 text-[13px] font-semibold text-black/70 hover:bg-black/[0.03] hover:text-black transition-colors"
                           >
                             My portfolio
                           </Link>
@@ -156,7 +227,7 @@ export default function Header() {
                               disconnect();
                               setDropdown(false);
                             }}
-                            className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] font-medium text-white/40 hover:text-danger hover:bg-danger/[0.06] transition-colors cursor-pointer border-t border-yellow-400/10"
+                            className="w-full flex items-center gap-2 px-3.5 py-3 text-[13px] font-semibold text-black/40 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer border-t border-black/[0.06]"
                           >
                             <LogOut size={13} />
                             Disconnect
@@ -168,29 +239,26 @@ export default function Header() {
                 )}
               </div>
 
-              {/* Mobile trigger — hidden on md and larger screens */}
               <button
                 onClick={() => setMobileOpen((v) => !v)}
                 aria-label="Menu"
-                className="flex md:!hidden btn btn-soft w-9 h-9 !px-0"
+                className="flex md:!hidden btn btn-soft w-10 h-10 !px-0"
               >
                 {mobileOpen ? <X size={17} /> : <Menu size={17} />}
-
               </button>
             </div>
           </div>
         </div>
       </header>
 
-      {/* ------------------------------------------------ mobile menu --- */}
       <div
-        className={`fixed inset-0 z-40 md:hidden bg-black transition-opacity duration-200 ${
+        className={`fixed inset-0 z-40 md:hidden bg-white transition-opacity duration-200 ${
           mobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
       >
-        <div className="flex flex-col h-full pt-[58px]">
-          <nav className="flex flex-col border-t border-yellow-400/10">
-            {NAV_LINKS.map((link, i) => {
+        <div className="flex flex-col h-full pt-[64px]">
+          <nav className="flex flex-col px-4 gap-1 mt-4">
+            {NAV_LINKS.map((link) => {
               if (link.external) {
                 return (
                   <a
@@ -199,12 +267,9 @@ export default function Header() {
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => setMobileOpen(false)}
-                    className="flex items-baseline gap-4 px-6 py-6 border-b border-yellow-400/10 text-white/60 hover:bg-yellow-500/5 transition-colors"
+                    className="px-4 py-3.5 text-[18px] font-bold text-black/50 hover:text-black rounded-2xl hover:bg-black/[0.03] transition-colors"
                   >
-                    <span className="mono text-[10px] text-white/30">
-                      {String(i + 1).padStart(2, '0')}
-                    </span>
-                    <span className="text-[26px] font-extrabold tracking-[-0.03em] text-white">{link.label}</span>
+                    {link.label}
                   </a>
                 );
               }
@@ -213,22 +278,21 @@ export default function Header() {
                   key={link.href}
                   to={link.href}
                   onClick={() => setMobileOpen(false)}
-                  className={`flex items-baseline gap-4 px-6 py-6 border-b border-yellow-400/10 transition-colors ${
-                    isActive(link.href) ? 'bg-yellow-500/5 text-white' : 'text-white/60 hover:bg-yellow-500/5'
+                  className={`px-4 py-3.5 text-[18px] font-bold rounded-2xl transition-colors ${
+                    isActive(link.href)
+                      ? 'text-[#f60aa8] bg-[rgba(246,10,168,0.12)]'
+                      : 'text-black/50 hover:text-black hover:bg-black/[0.03]'
                   }`}
                 >
-                  <span className="mono text-[10px] text-white/30">
-                    {String(i + 1).padStart(2, '0')}
-                  </span>
-                  <span className="text-[26px] font-extrabold tracking-[-0.03em] text-white">{link.label}</span>
+                  {link.label}
                 </Link>
               );
             })}
           </nav>
 
           <div className="mt-auto p-6 space-y-3">
-            <div className="flex items-center gap-1.5 mono text-[10px] uppercase tracking-[0.16em] text-white/40">
-              <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
+            <div className="flex items-center gap-1.5 text-[12px] font-semibold text-black/35">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e]" />
               {activeNetwork.label}
             </div>
             {!isConnected ? (
@@ -237,7 +301,7 @@ export default function Header() {
                   open();
                   setMobileOpen(false);
                 }}
-                className="btn btn-primary w-full h-13 py-4 text-[14px] yellow-gradient"
+                className="w-full h-12 text-[14px] font-bold rounded-full bg-black text-white hover:bg-black/85 transition-colors cursor-pointer"
               >
                 Connect wallet
               </button>
@@ -247,7 +311,7 @@ export default function Header() {
                   disconnect();
                   setMobileOpen(false);
                 }}
-                className="btn btn-soft w-full py-4 text-[13px]"
+                className="btn btn-soft w-full h-12 text-[13px]"
               >
                 <LogOut size={14} />
                 Disconnect {short}

@@ -897,7 +897,7 @@ export default function ProfilePage() {
             onClick={() => setIsSendModalOpen(false)}
           ></div>
 
-          <div className="relative w-full max-w-xl glass-morphism bg-[#0A0A0A] border border-primary/30 p-10 shadow-[0_0_50px_rgba(255,210,23,0.1)] animate-in zoom-in-95 duration-300 flex flex-col items-center rounded-3xl">
+          <div className="relative w-full max-w-xl glass-morphism bg-[#0A0A0A] border border-primary/30 p-10 shadow-[0_0_50px_rgba(184,134,11,0.1)] animate-in zoom-in-95 duration-300 flex flex-col items-center rounded-3xl">
             <button
               onClick={() => setIsSendModalOpen(false)}
               className="absolute top-6 right-6 text-white/20 hover:text-white transition-colors cursor-pointer"
@@ -1025,7 +1025,7 @@ export default function ProfilePage() {
               <button
                 onClick={handleSend}
                 disabled={sendLoading || (selectedTokenAddress === 'custom' && !customTokenDetails)}
-                className="py-4 bg-primary text-black text-[11px]   shadow-[0_0_20px_rgba(255,210,23,0.3)] hover:brightness-110 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+                className="py-4 bg-primary text-black text-[11px]   shadow-[0_0_20px_rgba(184,134,11,0.3)] hover:brightness-110 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {sendLoading ? (
                   <>

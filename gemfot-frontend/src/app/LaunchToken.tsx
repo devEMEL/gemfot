@@ -62,31 +62,23 @@ function Field({
   return (
     <label className="block">
       <div className="flex items-baseline justify-between mb-2 gap-3">
-        <span className="eyebrow text-white/50">{label}</span>
-        {hint && <span className="mono text-[10px] text-white/40">{hint}</span>}
+        <span className="text-[13px] font-bold text-black/70">{label}</span>
+        {hint && <span className="text-[11px] font-medium text-black/35">{hint}</span>}
       </div>
       {children}
     </label>
   );
 }
 
-/** A numbered section header, like a spec sheet. */
-function Section({ n, title, children }: { n: string; title: string; children: React.ReactNode }) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="border-t border-yellow-400/10 pt-6">
-      <div className="flex items-baseline gap-3 mb-5">
-        <span className="mono text-[10px] text-white/40">{n}</span>
-        <h2 className="text-[15px] font-bold tracking-tight text-white">{title}</h2>
-      </div>
+    <section className="pt-6 border-t border-black/[0.06]">
+      <h2 className="text-[15px] font-extrabold tracking-tight text-black mb-5">{title}</h2>
       <div className="space-y-5">{children}</div>
     </section>
   );
 }
 
-/**
- * Days / hours / minutes / seconds boxes. The creator fills whichever box(es)
- * they want and the total is converted to seconds.
- */
 function DurationField({
   label,
   hint,
@@ -118,7 +110,7 @@ function DurationField({
 
   return (
     <Field label={label} hint={hint}>
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-4 gap-2.5">
         {DURATION_UNITS.map((unit) => (
           <div key={unit.key} className="relative">
             <input
@@ -127,9 +119,9 @@ function DurationField({
               value={boxes[unit.key]}
               onChange={(e) => onBox(unit.key, e.target.value)}
               placeholder="0"
-              className="input-field num w-full h-11 pl-3.5 pr-8 text-[15px]"
+              className="input-field num w-full h-12 pl-3.5 pr-8 text-[15px]"
             />
-            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 mono text-[11px] text-ink-mute uppercase">
+            <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-[#f60aa8] uppercase">
               {unit.label}
             </span>
           </div>
@@ -232,89 +224,87 @@ export default function LaunchToken() {
             ? 'Waiting for confirmation…'
             : 'Launch token';
 
-  /* ------------------------------------------------------ success ---- */
   if (step === 'done' && result) {
     return (
-      <div className="max-w-xl mx-auto px-4 pt-32 pb-24">
-        <div className="border border-yellow-400/20 bg-gradient-to-b from-yellow-500/5 to-transparent rounded-xl">
-          <div className="hatch border-b border-yellow-400/20 px-8 py-8 text-center">
-            <div className="w-12 h-12 mx-auto bg-yellow-400 flex items-center justify-center mb-5">
-              <Check size={24} className="text-black" strokeWidth={3} />
+      <div className="pt-[64px] min-h-screen">
+        <div className="max-w-lg mx-auto px-4 py-16">
+          <div className="bg-white rounded-[28px] p-8 shadow-[0_2px_12px_rgba(15,17,21,0.06)] border border-black/[0.06] text-center flex flex-col items-center gap-5">
+            <div className="w-14 h-14 rounded-full bg-[#f60aa8] flex items-center justify-center shadow-[0_4px_14px_rgba(246,10,168,0.3)]">
+              <Check size={24} className="text-white" strokeWidth={3} />
             </div>
-            <span className="eyebrow">Launch confirmed</span>
-            <h2 className="display text-[34px] mt-3 text-white">{form.symbol.toUpperCase()} is live</h2>
-            <p className="text-white/70 text-[14px] mt-3 max-w-[40ch] mx-auto">
-              Your fair launch has started. The subgraph will index it in a few blocks.
-            </p>
-          </div>
-
-          <div className="divide-y divide-yellow-400/10">
-            {[
-              ['Token', result.memecoin, explorerAddress(result.memecoin)],
-              ['Transaction', result.txHash, explorerTx(result.txHash)],
-            ].map(([label, value, href]) => (
-              <div key={label} className="flex items-center justify-between px-6 py-3.5">
-                <span className="eyebrow">{label}</span>
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mono text-[12px] text-yellow-300 hover:text-yellow-200 flex items-center gap-1.5"
-                >
-                  {shortAddress(value, 6)}
-                  <ExternalLink size={11} />
-                </a>
-              </div>
-            ))}
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-px bg-yellow-400/5 border-t border-yellow-400/20">
-            <Link
-              to={`/token/${result.memecoin}`}
-              className="btn btn-primary py-3.5 !border-0 text-[14px] yellow-gradient"
-            >
-              View token page
-            </Link>
-            <button
-              onClick={() => {
-                reset();
-                setForm(initialForm);
-                setPreview(null);
-                setCustomMultiple('');
-              }}
-              className="btn btn-soft py-3.5 !border-0 text-[14px]"
-            >
-              Launch another
-            </button>
+            <div>
+              <p className="text-[12px] font-bold uppercase tracking-[0.12em] text-[#f60aa8]">Launch confirmed</p>
+              <h2 className="text-[28px] font-extrabold tracking-tight text-black mt-2">
+                {form.symbol.toUpperCase()} is live
+              </h2>
+              <p className="text-black/50 text-[14px] mt-2 max-w-[40ch] leading-relaxed mx-auto">
+                Your fair launch has started. The subgraph will index it in a few blocks.
+              </p>
+            </div>
+            <div className="w-full border-t border-black/[0.06] pt-5 space-y-3">
+              {[
+                ['Token', result.memecoin, explorerAddress(result.memecoin)],
+                ['Transaction', result.txHash, explorerTx(result.txHash)],
+              ].map(([label, value, href]) => (
+                <div key={label} className="flex items-center justify-between">
+                  <span className="text-[12px] font-semibold text-black/40">{label}</span>
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[13px] font-bold text-[#f60aa8] hover:text-[#d00890] flex items-center gap-1.5"
+                  >
+                    {shortAddress(value, 6)}
+                    <ExternalLink size={11} />
+                  </a>
+                </div>
+              ))}
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3 w-full mt-2">
+              <Link to={`/token/${result.memecoin}`} className="btn btn-primary h-12 text-[14px]">
+                View token page
+              </Link>
+              <button
+                onClick={() => {
+                  reset();
+                  setForm(initialForm);
+                  setPreview(null);
+                  setCustomMultiple('');
+                }}
+                className="btn btn-soft h-12 text-[14px]"
+              >
+                Launch another
+              </button>
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
-  /* --------------------------------------------------------- form ---- */
   return (
-    <div className="pt-[58px] min-h-screen bg-black text-white">
-      <div className="border-b border-yellow-400/10 bg-black/40">
-        <div className="max-w-[820px] mx-auto px-4 md:px-6 py-10">
-          <span className="eyebrow">New launch · {activeNetwork.label}</span>
-          <h1 className="display text-[38px] md:text-[52px] mt-4 text-white">Launch your memecoin</h1>
-          <p className="text-white/70 text-[15px] mt-4 max-w-[50ch] leading-relaxed">
-            Bonding-curve fair launch, automatic bid wall and creator fees. Launch fee is 10 USDC.
+    <div className="pt-[64px] min-h-screen">
+      <div className="max-w-[720px] mx-auto px-4 md:px-6 py-8 md:py-12">
+        <div className="text-center mb-8">
+          <p className="text-[12px] font-bold uppercase tracking-[0.14em] text-[#f60aa8]">
+            New launch · {activeNetwork.label}
+          </p>
+          <h1 className="text-[32px] md:text-[40px] font-extrabold tracking-tight text-black mt-2">
+            Launch your memecoin
+          </h1>
+          <p className="text-black/50 text-[15px] mt-3 max-w-[48ch] mx-auto leading-relaxed">
+            Bonding-curve fair launch, automatic liquidity, and creator fees. Launch fee is 10 USDC.
           </p>
         </div>
-      </div>
 
-      <div className="max-w-[820px] mx-auto px-4 md:px-6 py-8">
-        <form onSubmit={handleInitialSubmit} className="border border-white/[0.04] bg-gradient-to-b from-yellow-500/3 to-transparent rounded-xl p-6 md:p-8 space-y-6">
-          {/* -------------------------------------------------- identity */}
-          <section>
-            <div className="flex items-baseline gap-3 mb-5">
-              <span className="mono text-[10px] text-white/30">01</span>
-              <h2 className="text-[15px] font-bold tracking-tight text-white">Identity</h2>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-5">
+        <form
+          onSubmit={handleInitialSubmit}
+          className="bg-white rounded-[28px] p-6 md:p-8 shadow-[0_2px_12px_rgba(15,17,21,0.06)] border border-black/[0.06] space-y-0"
+        >
+          {/* Identity */}
+          <section className="pb-6">
+            <h2 className="text-[15px] font-extrabold tracking-tight text-black mb-5">Identity</h2>
+            <div className="flex flex-col sm:flex-row gap-6">
               <div className="shrink-0">
                 <input
                   ref={fileRef}
@@ -324,7 +314,7 @@ export default function LaunchToken() {
                   onChange={(e) => onPickImage(e.target.files?.[0])}
                 />
                 {preview ? (
-                  <div className="relative w-28 h-28 border border-yellow-400">
+                  <div className="relative w-28 h-28 rounded-2xl overflow-hidden shadow-md">
                     <img src={preview} alt="preview" className="w-full h-full object-cover" />
                     <button
                       type="button"
@@ -333,7 +323,7 @@ export default function LaunchToken() {
                         setPreview(null);
                         if (fileRef.current) fileRef.current.value = '';
                       }}
-                      className="absolute top-0 right-0 w-6 h-6 bg-yellow-400 text-black flex items-center justify-center hover:bg-yellow-300 transition-colors cursor-pointer"
+                      className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-white text-black flex items-center justify-center hover:bg-[rgba(246,10,168,0.12)] hover:text-[#f60aa8] transition-colors cursor-pointer shadow-sm"
                     >
                       <X size={12} />
                     </button>
@@ -347,22 +337,22 @@ export default function LaunchToken() {
                       e.preventDefault();
                       onPickImage(e.dataTransfer.files?.[0]);
                     }}
-                    className="w-28 h-28 border border-dashed border-yellow-400/40 bg-yellow-500/5 flex flex-col items-center justify-center gap-1.5 text-white/60 hover:text-white hover:border-yellow-400 transition-colors cursor-pointer"
+                    className="w-28 h-28 rounded-2xl border-2 border-dashed border-black/10 bg-[#f4f5f7] flex flex-col items-center justify-center gap-2 text-black/40 hover:text-[#f60aa8] hover:border-[#f60aa8]/40 hover:bg-[#fdf2f8] transition-colors cursor-pointer"
                   >
-                    <ImagePlus size={20} className="text-yellow-300" />
-                    <span className="mono text-[10px] uppercase tracking-[0.14em]">Image</span>
+                    <ImagePlus size={22} />
+                    <span className="text-[10px] font-bold uppercase tracking-[0.1em]">Image</span>
                   </button>
                 )}
               </div>
 
-              <div className="flex-1 space-y-5">
+              <div className="flex-1 space-y-4">
                 <Field label="Name">
                   <input
                     value={form.name}
                     onChange={(e) => set('name', e.target.value)}
                     placeholder="Gem Fot"
                     maxLength={40}
-                    className="input-field w-full h-11 px-3.5 text-[15px]"
+                    className="input-field w-full h-12 px-4 text-[15px]"
                   />
                 </Field>
                 <Field label="Ticker" hint={`${form.symbol.length}/12`}>
@@ -371,83 +361,77 @@ export default function LaunchToken() {
                     onChange={(e) => set('symbol', e.target.value.toUpperCase())}
                     placeholder="GEM"
                     maxLength={12}
-                    className="input-field mono w-full h-11 px-3.5 text-[15px] uppercase tracking-[0.08em]"
+                    className="input-field mono w-full h-12 px-4 text-[15px] uppercase tracking-[0.08em]"
                   />
                 </Field>
               </div>
             </div>
           </section>
 
-  {/* --------------------------------------------------- supply */}
-          <Section n="02" title="Supply">
-            <div className="grid sm:grid-cols-2 gap-5">
+          <Section title="Supply">
+            <div className="grid sm:grid-cols-2 gap-4">
               <Field label="Total supply" hint="tokens">
                 <input
                   type="text"
                   inputMode="decimal"
                   value={form.totalSupply}
                   onChange={(e) => set('totalSupply', e.target.value.replace(/[^0-9.]/g, ''))}
-                  className="input-field num w-full h-11 px-3.5 text-[15px]"
+                  className="input-field num w-full h-12 px-4 text-[15px]"
                 />
               </Field>
-
               <Field label="Fair launch supply" hint="% of total">
                 <div className="relative">
                   <input
                     type="text"
                     inputMode="decimal"
                     value={form.fairLaunchPercent}
-                    onChange={(e) => set('fairLaunchPercent', Number(e.target.value.replace(/[^0-9.]/g, '')))}
-                    className="input-field num w-full h-11 pl-3.5 pr-9 text-[15px]"
+                    onChange={(e) =>
+                      set('fairLaunchPercent', Number(e.target.value.replace(/[^0-9.]/g, '')))
+                    }
+                    className="input-field num w-full h-12 pl-4 pr-10 text-[15px]"
                   />
-                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 mono text-[12px] text-yellow-300">
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-bold text-[#f60aa8]">
                     %
                   </span>
                 </div>
               </Field>
             </div>
-
-            {/* Premine disabled — not implemented in contract */}
           </Section>
 
-          {/* ------------------------------------------------ the curve */}
-          <Section n="03" title="The curve & timing">
+          <Section title="The curve & timing">
             <DurationField
               label="Fair launch duration"
               hint="days / hours / minutes / seconds"
               value={form.fairLaunchDuration}
               onChange={(seconds) => set('fairLaunchDuration', seconds)}
             />
-
             <DurationField
               label="Launch delay"
               hint="0 = immediately"
               value={form.startsInSeconds}
               onChange={(seconds) => set('startsInSeconds', seconds)}
             />
-
-            <div className="grid sm:grid-cols-2 gap-5">
+            <div className="grid sm:grid-cols-2 gap-4">
               <Field label="Target market cap" hint={CONTRACTS.nativeTokenSymbol}>
                 <input
                   type="text"
                   inputMode="decimal"
                   value={form.targetMarketCap}
                   onChange={(e) => set('targetMarketCap', e.target.value.replace(/[^0-9.]/g, ''))}
-                  className="input-field num w-full h-11 px-3.5 text-[15px]"
+                  className="input-field num w-full h-12 px-4 text-[15px]"
                 />
-                <p className="mt-2 mono text-[11px] text-white/40 flex items-baseline justify-between">
-                  <span className="text-white/50">Expected raise</span>
-                  <span className="font-semibold text-yellow-300">
+                <p className="mt-2 text-[12px] text-black/40 flex items-baseline justify-between">
+                  <span>Expected raise</span>
+                  <span className="font-bold text-[#f60aa8]">
                     {expectedRaise !== null
                       ? `$${expectedRaise.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
                       : '—'}{' '}
-                    <span className="text-white/40 font-normal">{CONTRACTS.nativeTokenSymbol}</span>
+                    <span className="text-black/30 font-medium">{CONTRACTS.nativeTokenSymbol}</span>
                   </span>
                 </p>
               </Field>
-
               <Field label="Curve multiple" hint="max 20x">
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="grid grid-cols-5 gap-1.5">
                     {PRESET_MULTIPLES.map((m) => (
                       <button
@@ -457,10 +441,10 @@ export default function LaunchToken() {
                           set('multiple', m);
                           setCustomMultiple('');
                         }}
-                        className={`h-9 rounded border mono text-[12px] font-semibold transition-all ${
+                        className={`h-10 rounded-full text-[12px] font-bold transition-all cursor-pointer ${
                           form.multiple === m && !customMultiple
-                            ? 'bg-yellow-400 text-black border-yellow-400'
-                            : 'bg-white/[0.03] text-white/40 border-white/[0.06] hover:border-yellow-400/30'
+                            ? 'bg-[#f60aa8] text-white shadow-[0_4px_12px_rgba(246,10,168,0.25)]'
+                            : 'bg-[#f4f5f7] text-black/40 hover:text-black hover:bg-[#f4f5f7]'
                         }`}
                       >
                         {m}x
@@ -472,13 +456,15 @@ export default function LaunchToken() {
                       type="text"
                       inputMode="decimal"
                       value={customMultiple}
-                      onChange={(e) => onCustomMultipleChange(e.target.value.replace(/[^0-9.]/g, ''))}
+                      onChange={(e) =>
+                        onCustomMultipleChange(e.target.value.replace(/[^0-9.]/g, ''))
+                      }
                       placeholder="Custom multiple (e.g. 15)"
-                      className={`input-field num w-full h-10 pl-3.5 pr-8 text-[13px] ${
-                        customMultiple ? 'border-yellow-400' : ''
+                      className={`input-field num w-full h-12 pl-4 pr-8 text-[14px] ${
+                        customMultiple ? '!border-[#f60aa8]/50' : ''
                       }`}
                     />
-                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 mono text-[11px] text-yellow-300">
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-bold text-[#f60aa8]">
                       x
                     </span>
                   </div>
@@ -487,119 +473,120 @@ export default function LaunchToken() {
             </div>
           </Section>
 
-          {/* --------------------------------------------------- payout */}
-          <Section n="04" title="Payout">
+          <Section title="Payout">
             <Field label="Creator fee share" hint="max 70% of swap fees">
               <div className="relative">
                 <input
                   type="text"
                   inputMode="decimal"
                   value={form.creatorFeeAllocationPercent}
-                  onChange={(e) => set('creatorFeeAllocationPercent', Number(e.target.value.replace(/[^0-9.]/g, '')))}
-                  className="input-field num w-full h-11 pl-3.5 pr-9 text-[15px]"
+                  onChange={(e) =>
+                    set('creatorFeeAllocationPercent', Number(e.target.value.replace(/[^0-9.]/g, '')))
+                  }
+                  className="input-field num w-full h-12 pl-4 pr-10 text-[15px]"
                 />
-                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 mono text-[12px] text-yellow-300">
+                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[12px] font-bold text-[#f60aa8]">
                   %
                 </span>
               </div>
             </Field>
           </Section>
 
-          {/* --------------------------------------------------- submit */}
-          <div className="border-t border-yellow-400/10 pt-6 space-y-3">
+          <div className="pt-6 border-t border-black/[0.06] space-y-4">
             {error && (
-              <div className="flex items-start gap-2.5 px-3.5 py-3 border border-danger/40 bg-danger/[0.05]">
-                <AlertTriangle size={15} className="text-danger shrink-0 mt-0.5" />
-                <p className="mono text-[11px] text-danger leading-relaxed break-words">{error}</p>
+              <div className="flex items-start gap-3 px-4 py-3 rounded-2xl bg-red-50 border border-red-100">
+                <AlertTriangle size={16} className="text-red-500 shrink-0 mt-0.5" />
+                <p className="text-[13px] text-red-600 leading-relaxed break-words">{error}</p>
               </div>
             )}
 
             {!valid && Object.keys(errors).length > 0 && (
-              <p className="mono text-[10px] uppercase tracking-[0.14em] text-white/50">
-                {Object.values(errors)[0]}
-              </p>
+              <p className="text-[12px] font-semibold text-black/40">{Object.values(errors)[0]}</p>
             )}
 
             <button
               type="submit"
               disabled={isBusy || (isConnected && !valid)}
-              className="btn btn-primary w-full py-4 text-[15px] yellow-gradient"
+              className="btn btn-primary w-full h-14 text-[15px]"
             >
               {isBusy && <Loader2 size={16} className="animate-spin" />}
               {isConnected ? stepLabel : 'Connect wallet to launch'}
             </button>
 
-            <p className="mono text-[10px] uppercase tracking-[0.14em] text-white/40 text-center">
+            <p className="text-[12px] font-medium text-black/35 text-center">
               Launch fee is 10 USDC + gas on {activeNetwork.label}
             </p>
           </div>
         </form>
       </div>
 
-      {/* ------------------------------------------- Confirmation Modal */}
       {showConfirmModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="border border-yellow-400/20 bg-gradient-to-b from-yellow-500/5 to-black/40 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-6 text-white">
-            <div className="flex items-center justify-between border-b border-yellow-400/20 pb-4">
-              <h3 className="text-lg font-bold text-white">Review Token Launch Details</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-white/40 backdrop-blur-sm">
+          <div className="bg-white rounded-[28px] max-w-lg w-full p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-4 border-b border-black/[0.06]">
+              <h3 className="text-[17px] font-extrabold text-black">Review launch</h3>
               <button
                 onClick={() => setShowConfirmModal(false)}
-                className="text-white/40 hover:text-white transition-colors"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-black/30 hover:text-black hover:bg-black/[0.03] transition-colors cursor-pointer"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
-            <div className="space-y-3 text-sm font-mono">
+            <div className="space-y-1 text-[13px]">
               {[
-                ['Token Name', form.name, null],
-                ['Ticker', form.symbol, null],
-                ['Total Supply', Number(form.totalSupply).toLocaleString(), null],
-                ['Fair Launch Supply', `${form.fairLaunchPercent}%`, null],
-                ['Fair Launch Duration', formatDuration(form.fairLaunchDuration), null],
+                ['Token Name', form.name],
+                ['Ticker', form.symbol],
+                ['Total Supply', Number(form.totalSupply).toLocaleString()],
+                ['Fair Launch Supply', `${form.fairLaunchPercent}%`],
+                ['Fair Launch Duration', formatDuration(form.fairLaunchDuration)],
                 [
-                  'Launch Start (launchAt)',
+                  'Launch Start',
                   form.startsInSeconds > 0
                     ? `Starts in ${formatDuration(form.startsInSeconds)}`
                     : 'Immediately',
-                  null,
                 ],
-                ['Target Market Cap', `$${Number(form.targetMarketCap).toLocaleString()} USDC`, null],
-                ['Expected Raise',
+                ['Target Market Cap', `$${Number(form.targetMarketCap).toLocaleString()} USDC`],
+                [
+                  'Expected Raise',
                   expectedRaise !== null
                     ? `$${expectedRaise.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDC`
                     : '—',
-                  null],
-                ['Curve Multiple', `${form.multiple}x`, null],
-                ['Creator Fee Share', `${form.creatorFeeAllocationPercent}%`, null],
+                ],
+                ['Curve Multiple', `${form.multiple}x`],
+                ['Creator Fee Share', `${form.creatorFeeAllocationPercent}%`],
               ].map(([label, value]) => (
-                <div key={label} className="flex justify-between py-1 border-b border-white/[0.05]">
-                  <span className="text-white/50">{label}</span>
-                  <span className="font-semibold text-white">{value}</span>
+                <div
+                  key={label}
+                  className="flex justify-between py-2.5 border-b border-black/[0.06]"
+                >
+                  <span className="text-black/40 font-medium">{label}</span>
+                  <span className="font-bold text-black">{value}</span>
                 </div>
               ))}
-              <div className="flex justify-between py-1 border-b border-white/[0.05] text-yellow-300">
-                <span>Launch Fee</span>
-                <span className="font-bold">10 USDC</span>
+              <div className="flex justify-between py-2.5 text-[#f60aa8]">
+                <span className="font-semibold">Launch Fee</span>
+                <span className="font-extrabold">10 USDC</span>
               </div>
             </div>
 
-            <p className="text-xs text-white/50 leading-relaxed">
-              By proceeding, you will approve GemFotManager to spend 10 USDC (if not already approved) and trigger the token deployment transaction.
+            <p className="text-[12px] text-black/40 leading-relaxed">
+              By proceeding, you will approve GemFotManager to spend 10 USDC and trigger token
+              deployment.
             </p>
 
-            <div className="flex gap-3 pt-2">
+            <div className="flex gap-3 pt-1">
               <button
                 type="button"
                 onClick={() => setShowConfirmModal(false)}
-                className="flex-1 py-3 border border-white/[0.08] rounded-lg text-sm font-medium text-white/70 hover:bg-white/[0.05] transition-colors"
+                className="flex-1 btn btn-soft h-12 text-[14px]"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleConfirmLaunch}
-                className="flex-1 py-3 bg-yellow-400 text-black font-semibold rounded-lg text-sm hover:brightness-110 transition-all yellow-gradient"
+                className="flex-1 btn btn-primary h-12 text-[14px]"
               >
                 Confirm & Launch
               </button>

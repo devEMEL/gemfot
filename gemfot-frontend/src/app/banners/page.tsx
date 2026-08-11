@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Sparkles, ArrowRight, Share2, Copy, Check, Shield, Layers, HelpCircle, AlertCircle, Compass } from 'lucide-react';
+import { Sparkles, ArrowRight, Share2, Copy, Check, Shield, Layers, HelpCircle, AlertCircle, Compass, Users, BarChart3 } from 'lucide-react';
 
 export default function BannersPage() {
   const [copiedLink, setCopiedLink] = useState(false);
@@ -51,6 +51,107 @@ export default function BannersPage() {
           Partnership assets for the mlSwap x ArcLens campaign. Select a banner format to review or copy embed code.
         </p>
       </header>
+
+      {/* Stat Section */}
+      <div className="mb-12 p-6 bg-neutral-950/60 border border-white/[0.06] rounded-2xl">
+        <div className="flex items-center gap-3 mb-5">
+          <BarChart3 size={20} className="text-primary" />
+          <h2 className="text-xl font-semibold text-white">mlSwap Community Stats</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Stats Cards */}
+          <div className="space-y-3">
+            {[
+              { name: 'Swappers', value: '174' },
+              { name: 'Swaps', value: '10,667' },
+              { name: 'Liquidity Providers', value: '45' },
+              { name: 'Position Owners', value: '42' },
+            ].map((stat) => (
+              <div
+                key={stat.name}
+                className="flex items-center justify-between p-3 bg-black/30 border border-white/[0.04] rounded-xl"
+              >
+                <div className="flex items-center gap-3">
+                  <Users size={16} className="text-primary" />
+                  <span className="text-sm text-white/70">{stat.name}</span>
+                </div>
+                <span className="text-lg font-bold text-primary">
+                  {stat.value}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Circular Pie Chart - Corrected Implementation */}
+          <div className="space-y-4">
+            <div className="relative w-48 h-48 mx-auto">
+              <svg viewBox="0 0 36 36" className="w-full h-full">
+                {[
+                  { name: 'Swappers', value: 174, color: '#FFD700' },
+                  { name: 'Swaps', value: 10667, color: '#FFA500' },
+                  { name: 'Liquidity Providers', value: 45, color: '#FFB74D' },
+                  { name: 'Position Owners', value: 42, color: '#FFCC80' },
+                ].map((stat, index, arr) => {
+                  const total = arr.reduce((sum, s) => sum + s.value, 0);
+                  const percentage = (stat.value / total) * 100;
+                  // Each segment is a circle starting at -90 degrees (top)
+                  // stroke-dasharray creates the arc length
+                  // stroke-dashoffset shifts where drawing begins
+                  const offset = arr.slice(0, index).reduce((sum, s) => sum + (s.value / total) * 100, 0);
+                  
+                  return (
+                    <g key={stat.name}>
+                      <circle
+                        cx="18"
+                        cy="18"
+                        r="14"
+                        fill="transparent"
+                        stroke={stat.color}
+                        strokeWidth="4"
+                        strokeDasharray={`${percentage} ${100 - percentage}`}
+                        strokeDashoffset={100 - offset}
+                        transform="rotate(-90 18 18)"
+                      />
+                    </g>
+                  );
+                })}
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-[10px] text-white/30 uppercase tracking-wider">mlSwap</span>
+                <span className="text-[10px] text-white/30 uppercase tracking-wider">User Segments</span>
+              </div>
+            </div>
+
+            {/* Legend */}
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { name: 'Swappers', value: 174, color: '#FFD700' },
+                { name: 'Swaps', value: 10667, color: '#FFA500' },
+                { name: 'Liquidity Providers', value: 45, color: '#FFB74D' },
+                { name: 'Position Owners', value: 42, color: '#FFCC80' },
+              ].map((stat) => {
+                const total = 174 + 10667 + 45 + 42;
+                const percentage = ((stat.value / total) * 100).toFixed(1);
+                return (
+                  <div
+                    key={stat.name}
+                    className="flex items-center gap-2"
+                  >
+                    <div
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: stat.color }}
+                    />
+                    <span className="text-[10px] text-white/50">{stat.name}:</span>
+                    <span className="num text-[10px] font-bold text-white">
+                      {stat.value.toLocaleString()} ({percentage}%)
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Format Selector Tabs */}
       <div className="flex items-center gap-2 p-1 bg-white/[0.02] border border-white/[0.06] rounded-xl mb-8 w-fit">

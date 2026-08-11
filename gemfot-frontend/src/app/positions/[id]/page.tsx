@@ -733,7 +733,7 @@ export default function PositionDetailsPage() {
             <p className="text-[11px] text-white/40  mt-2">{details.token1.symbol} per {details.token0.symbol}</p>
           </div>
 
-          <div className="text-center p-8 bg-primary/5 border border-primary/20 rounded-2xl relative shadow-[0_0_30px_rgba(255,210,23,0.05)]">
+          <div className="text-center p-8 bg-primary/5 border border-primary/20 rounded-2xl relative shadow-[0_0_30px_rgba(184,134,11,0.05)]">
             <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-black text-[11px] px-3 py-1  tracking-[0.2em] rounded-full">Current Market</div>
             <p className="text-[11px]   text-primary/40 mb-2">Current Price</p>
             <p className="text-3xl text-primary">{details.currentPrice.toLocaleString(undefined, { maximumFractionDigits: 6 })}</p>
@@ -845,7 +845,7 @@ export default function PositionDetailsPage() {
             onClick={() => setActiveModal(null)}
           ></div>
 
-          <div className="relative w-full max-w-xl glass-morphism bg-[#0A0A0A] border border-primary/30 p-10 shadow-[0_0_50px_rgba(255,210,23,0.1)] animate-in zoom-in-95 duration-300 flex flex-col items-center">
+          <div className="relative w-full max-w-xl glass-morphism bg-[#0A0A0A] border border-primary/30 p-10 shadow-[0_0_50px_rgba(184,134,11,0.1)] animate-in zoom-in-95 duration-300 flex flex-col items-center">
             <button
               onClick={() => setActiveModal(null)}
               className="absolute top-6 right-6 text-white/20 hover:text-white transition-colors"
@@ -911,7 +911,7 @@ export default function PositionDetailsPage() {
               <button
                 onClick={handleCollectFees}
                 disabled={isPending}
-                className="py-4 px-6 rounded-full bg-primary text-black text-[10px] font-bold  tracking-[0.2em] shadow-[0_0_30px_rgba(255,210,23,0.2)] hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
+                className="py-4 px-6 rounded-full bg-primary text-black text-[10px] font-bold  tracking-[0.2em] shadow-[0_0_30px_rgba(184,134,11,0.2)] hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
               >
                 {isPending && <RefreshCw size={12} className="animate-spin" />}
                 Collect All Fees
@@ -929,7 +929,7 @@ export default function PositionDetailsPage() {
             onClick={() => setActiveModal(null)}
           ></div>
 
-          <div className="relative w-full max-w-xl glass-morphism bg-[#0A0A0A] border border-primary/30 p-10 shadow-[0_0_50px_rgba(255,210,23,0.1)] animate-in zoom-in-95 duration-300 flex flex-col items-center">
+          <div className="relative w-full max-w-xl glass-morphism bg-[#0A0A0A] border border-primary/30 p-10 shadow-[0_0_50px_rgba(184,134,11,0.1)] animate-in zoom-in-95 duration-300 flex flex-col items-center">
             <button
               onClick={() => setActiveModal(null)}
               className="absolute top-6 right-6 text-white/20 hover:text-white transition-colors"
@@ -1059,7 +1059,7 @@ export default function PositionDetailsPage() {
               <button
                 onClick={handleIncreaseLiquiditySubmit}
                 disabled={isPending}
-                className="py-4 px-6 rounded-full bg-primary text-black text-[10px] font-bold  tracking-[0.2em] shadow-[0_0_20px_rgba(255,210,23,0.3)] hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
+                className="py-4 px-6 rounded-full bg-primary text-black text-[10px] font-bold  tracking-[0.2em] shadow-[0_0_20px_rgba(184,134,11,0.3)] hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
               >
                 {isPending && <RefreshCw size={12} className="animate-spin" />}
                 Add Liquidity
@@ -1077,7 +1077,7 @@ export default function PositionDetailsPage() {
             onClick={() => setActiveModal(null)}
           ></div>
 
-          <div className="relative w-full max-w-xl glass-morphism bg-[#0A0A0A] border border-primary/30 p-10 shadow-[0_0_50px_rgba(255,210,23,0.1)] animate-in zoom-in-95 duration-300 flex flex-col items-center">
+          <div className="relative w-full max-w-xl glass-morphism bg-[#0A0A0A] border border-primary/30 p-10 shadow-[0_0_50px_rgba(184,134,11,0.1)] animate-in zoom-in-95 duration-300 flex flex-col items-center">
             <button
               onClick={() => setActiveModal(null)}
               className="absolute top-6 right-6 text-white/20 hover:text-white transition-colors"
@@ -1222,7 +1222,7 @@ export default function PositionDetailsPage() {
               <button
                 onClick={handleDecreaseLiquidity}
                 disabled={isPending}
-                className="py-4 px-6 rounded-full bg-primary text-black text-[10px] font-bold  tracking-[0.2em] shadow-[0_0_20px_rgba(255,210,23,0.3)] hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
+                className="py-4 px-6 rounded-full bg-primary text-black text-[10px] font-bold  tracking-[0.2em] shadow-[0_0_20px_rgba(184,134,11,0.3)] hover:brightness-110 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
               >
                 {isPending && <RefreshCw size={12} className="animate-spin" />}
                 Remove Liquidity

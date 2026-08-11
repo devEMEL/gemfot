@@ -1,65 +1,71 @@
 @import "tailwindcss";
 
 @theme {
-  /* --- Yellow gradient palette on black --- */
-  --color-yellow-50: #fffde7;
-  --color-yellow-100: #fef9c3;
-  --color-yellow-200: #fef08a;
-  --color-yellow-300: #fde047;
-  --color-yellow-400: #facc15;
-  --color-yellow-500: #ffd217;
-  --color-yellow-600: #eab308;
-  --color-yellow-700: #d9b400;
-  --color-yellow-800: #b89900;
-  --color-yellow-900: #986b00;
+  --font-sans: "Raleway", "Ubuntu", ui-sans-serif, sans-serif;
+  --font-mono: "basierCircle", "Ubuntu Mono", ui-monospace, monospace;
+  --font-display: "bbTorsoPro", "Raleway", ui-sans-serif, sans-serif;
 
-  --color-primary: #ffd217;
-  --color-primary-bright: #ffe066;
-  --color-accent: #ffd217;
-  --color-danger: #ff6b57;
+  --color-pink-500: #f60aa8;
+  --color-pink-600: #d00890;
+  --color-pink-400: #ff4db8;
+  --color-pink-300: #fda5e0;
+  --color-pink-100: #fce7f3;
+  --color-pink-50: #fdf2f8;
 
-  /* Surfaces — dark black system. "ink" is now the *foreground*, "cream" the page. */
-  --color-cream: #000000;
-  --color-cream-deep: #000000;
-  --color-paper: #0b0b0b;
-  --color-ink: #f4f7f1;
-  --color-ink-soft: #e5e7e0;
-  --color-ink-mute: #b8bbaf;
-  --color-rule: rgba(255, 210, 23, 0.22);
-  --color-rule-soft: rgba(255, 210, 23, 0.08);
+  --color-green-500: #22c55e;
+  --color-green-400: #4ade80;
+  --color-purple-500: #a855f7;
+  --color-purple-400: #c084fc;
+  --color-blue-500: #3b82f6;
+  --color-blue-400: #60a5fa;
 
-  /* Green gradient boxes */
-  --gradient-box: linear-gradient(
-    145deg,
-    rgba(255, 210, 23, 0.14) 0%,
-    rgba(215, 173, 9, 0.06) 52%,
-    rgba(0, 0, 0, 0.92) 100%
-  );
-  --gradient-box-strong: linear-gradient(135deg, #ffd217 0%, #ffe066 100%);
-  
-  --font-raleway: "Raleway", ui-sans-serif, sans-serif;
-  --font-ubuntu: "Ubuntu", ui-sans-serif, sans-serif;
-  --font-ubuntu-mono: "Ubuntu Mono", ui-sans-serif, sans-serif;
-  --font-figtree: "Figtree", ui-sans-serif, sans-serif;
+  --color-primary: #f60aa8;
+  --color-primary-bright: #ff4db8;
+  --color-accent: #f60aa8;
+  --color-danger: #ef4444;
 
-  /* Everything is square in this system. */
-  --radius-sm: 0px;
-  --radius-md: 0px;
-  --radius-lg: 0px;
-  --radius-xl: 0px;
-  --radius-2xl: 0px;
-  --radius-3xl: 0px;
-  --radius-DEFAULT: 0px;
+  /* Light surfaces */
+  --color-cream: #f7f7f8;
+  --color-cream-deep: #f0f1f3;
+  --color-paper: #ffffff;
+  --color-ink: #0f1115;
+  --color-ink-soft: #3a3f4b;
+  --color-ink-mute: #8b909a;
+  --color-rule: rgba(15, 17, 21, 0.08);
+  --color-rule-soft: rgba(15, 17, 21, 0.05);
+  --color-card: #ffffff;
+  --color-background: #f7f7f8;
+  --color-border: rgba(15, 17, 21, 0.08);
+  --color-muted: #f0f1f4;
+  --color-muted-foreground: #8b909a;
+
+  --gradient-box: #ffffff;
+  --gradient-box-strong: linear-gradient(135deg, #f60aa8 0%, #ff4db8 100%);
+  --gradient-pink-sky: linear-gradient(90deg, #f60aa8 0%, #ff4db8 50%, #60a5fa 100%);
+  --gradient-pink-violet: linear-gradient(90deg, #f60aa8 0%, #ff4db8 50%, #a855f7 100%);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-3xl: 28px;
+  --radius-full: 9999px;
+  --radius-DEFAULT: 12px;
+
+  --shadow-card: 0 2px 12px rgba(15, 17, 21, 0.06), 0 1px 3px rgba(15, 17, 21, 0.04);
+  --shadow-card-hover: 0 8px 28px rgba(15, 17, 21, 0.1), 0 2px 8px rgba(15, 17, 21, 0.06);
 }
+
+@import url('https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700;800;900&family=Ubuntu:wght@400;500;700&display=swap');
 
 html,
 body,
 #root {
-  background-color: #000000;
+  background-color: #f7f7f8;
   color: var(--color-ink);
-  font-family: var(--font-ubuntu);
+  font-family: var(--font-sans);
   font-size: 16px;
-  /* Heavier baseline — no more faint text. */
   font-weight: 500;
   font-variant-numeric: lining-nums tabular-nums;
   -webkit-font-smoothing: antialiased;
@@ -67,12 +73,10 @@ body,
 }
 
 body {
-  /* Faint engineering grid — now glowing yellow on black. */
-  background-color: #000000;
-  background-image: linear-gradient(rgba(255, 210, 23, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 210, 23, 0.03) 1px, transparent 1px);
-  background-size: 56px 56px;
-  background-position: -1px -1px;
+  background-color: #f7f7f8;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 70% -10%, rgba(246, 10, 168, 0.06), transparent),
+    radial-gradient(ellipse 60% 40% at 10% 20%, rgba(246, 10, 168, 0.03), transparent);
   background-attachment: fixed;
 }
 
@@ -81,32 +85,11 @@ body {
 }
 
 ::selection {
-  background: #ffd217;
-  color: #050704;
+  background: #f60aa8;
+  color: #ffffff;
 }
 
-/* Nothing should render thinner than medium. */
-p,
-span,
-li,
-a,
-label,
-td,
-th,
-div,
-button,
-input,
-select,
-textarea {
-  font-weight: inherit;
-}
-
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
+h1, h2, h3, h4, h5, h6 {
   font-weight: 800;
   letter-spacing: -0.02em;
 }
@@ -122,7 +105,6 @@ h6 {
 }
 
 @layer utilities {
-  /* --------------------------------------------------- typography ---- */
   .mono {
     font-family: var(--font-mono);
     font-weight: 500;
@@ -139,30 +121,28 @@ h6 {
     font-family: var(--font-mono);
     font-size: 10px;
     line-height: 1;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
     font-weight: 600;
     color: var(--color-ink-mute);
   }
   .display {
+    font-family: var(--font-display);
     letter-spacing: -0.035em;
     font-weight: 800;
     line-height: 0.95;
   }
 
-  /* Muted text helpers — readable on black */
   .text-muted {
     color: var(--color-ink-mute);
     font-weight: 500;
   }
 
-  /* ------------------------------------------------------- buttons ---- */
   .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    border-radius: 0;
     font-weight: 700;
     font-size: 14px;
     letter-spacing: -0.01em;
@@ -177,169 +157,129 @@ h6 {
   }
 
   .btn-primary,
-  .btn-ink {
-    background: var(--gradient-box-strong);
-    color: #050704;
-    border: 1px solid #ffd217;
+  .btn-ink,
+  .btn-pink,
+  .yellow-gradient {
+    background: #f60aa8;
+    color: #ffffff;
+    border: 1px solid #f60aa8;
+    border-radius: 9999px;
+    box-shadow: 0 4px 14px rgba(246, 10, 168, 0.25);
   }
   .btn-primary:hover:not(:disabled),
-  .btn-ink:hover:not(:disabled) {
-    filter: brightness(1.15);
-    box-shadow: 0 0 20px rgba(255, 210, 23, 0.5);
+  .btn-ink:hover:not(:disabled),
+  .btn-pink:hover:not(:disabled),
+  .yellow-gradient:hover:not(:disabled) {
+    background: #ff4db8;
+    border-color: #ff4db8;
+    box-shadow: 0 6px 20px rgba(246, 10, 168, 0.35);
   }
   .btn-primary:active:not(:disabled),
-  .btn-ink:active:not(:disabled) {
-    transform: translateY(1px);
+  .btn-ink:active:not(:disabled),
+  .btn-pink:active:not(:disabled),
+  .yellow-gradient:active:not(:disabled) {
+    transform: scale(0.97);
   }
 
   .btn-accent {
-    background: var(--gradient-box-strong);
-    color: #050704;
-    border: 1px solid #ffd217;
+    background: #f60aa8;
+    color: #ffffff;
+    border: 1px solid #f60aa8;
+    border-radius: 9999px;
   }
   .btn-accent:hover:not(:disabled) {
-    filter: brightness(1.12);
+    background: #ff4db8;
   }
 
   .btn-soft {
-    background: linear-gradient(145deg, rgba(255, 210, 23, 0.12), rgba(0, 0, 0, 0.6));
+    background: #ffffff;
     color: var(--color-ink);
     border: 1px solid var(--color-rule);
+    border-radius: 9999px;
+    box-shadow: 0 1px 3px rgba(15, 17, 21, 0.04);
   }
   .btn-soft:hover:not(:disabled) {
-    border-color: #ffd217;
-    color: #fef08a;
+    border-color: rgba(246, 10, 168, 0.35);
+    color: #f60aa8;
   }
 
   .btn-ghost {
     background: transparent;
     color: var(--color-ink-soft);
     border: 1px solid transparent;
+    border-radius: 9999px;
   }
   .btn-ghost:hover:not(:disabled) {
-    color: #fef08a;
-    border-color: var(--color-rule);
+    color: #f60aa8;
+    background: rgba(246, 10, 168, 0.06);
   }
 
   .btn-danger {
     background: transparent;
     color: var(--color-danger);
-    border: 1px solid rgba(255, 107, 87, 0.4);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    border-radius: 9999px;
   }
   .btn-danger:hover:not(:disabled) {
-    background: rgba(255, 107, 87, 0.12);
-    border-color: var(--color-danger);
+    background: rgba(239, 68, 68, 0.08);
   }
 
-  /* ------------------------------------------------------ surfaces ---- */
+  .btn-green {
+    background: #22c55e;
+    color: #ffffff;
+    border: 1px solid #22c55e;
+    border-radius: 9999px;
+  }
+
   .card {
-    background: var(--gradient-box);
-    background-color: #0b0d0a;
+    background: #ffffff;
     border: 1px solid var(--color-rule);
-    border-radius: 0;
+    border-radius: 28px;
     color: var(--color-ink);
+    box-shadow: var(--shadow-card);
   }
   .card-hover {
     transition: border-color 0.14s ease, box-shadow 0.14s ease, transform 0.14s ease;
   }
   .card-hover:hover {
-    border-color: #ffd217;
-    box-shadow: 4px 4px 0 0 rgba(255, 210, 23, 0.45);
-    transform: translate(-2px, -2px);
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-2px);
   }
 
-  /* A tile in a data grid: shares borders with its neighbours */
   .tile {
-    background: var(--gradient-box);
-    background-color: #0b0d0a;
+    background: #ffffff;
     border: 1px solid var(--color-rule);
-    border-radius: 0;
+    border-radius: 28px;
+    box-shadow: var(--shadow-card);
   }
 
   .slab {
-    background: var(--gradient-box-strong);
-    color: #050704;
-    border: 1px solid #ffd217;
-  }
-
-  .hatch {
-    background-image: repeating-linear-gradient(
-      45deg,
-      rgba(255, 210, 23, 0.08) 0px,
-      rgba(255, 210, 23, 0.08) 1px,
-      transparent 1px,
-      transparent 7px
-    );
-  }
-
-  /* Yellow gradient button — primary call-to-action */
-  .yellow-gradient {
-    background: linear-gradient(135deg, #ffd217 0%, #ffe066 100%);
-    color: #050704;
-    border-color: #ffd217;
-    transition: all 0.14s ease;
-  }
-  .yellow-gradient:hover:not(:disabled) {
-    box-shadow: 0 0 20px rgba(255, 210, 23, 0.5);
-    filter: brightness(1.05);
-  }
-  .yellow-gradient:active:not(:disabled) {
-    transform: scale(0.98);
-  }
-
-  .rule-t {
-    border-top: 1px solid var(--color-rule);
-  }
-  .rule-b {
-    border-bottom: 1px solid var(--color-rule);
-  }
-  .rule-l {
-    border-left: 1px solid var(--color-rule);
-  }
-  .rule-r {
-    border-right: 1px solid var(--color-rule);
+    background: #f60aa8;
+    color: #ffffff;
+    border: 1px solid #f60aa8;
   }
 
   .text-gradient {
-    background: var(--gradient-box-strong);
+    background: linear-gradient(135deg, #f60aa8 0%, #ff4db8 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
     font-weight: 800;
   }
 
-  /* Glass morphism — mlswap inspired */
   .glass-morphism {
-    background: rgba(19, 19, 19, 0.4);
-    backdrop-filter: blur(40px);
-    border: 1px solid rgba(255, 210, 23, 0.08);
-    box-shadow: inset 0 0 40px rgba(255, 210, 23, 0.01), 0 20px 50px rgba(0, 0, 0, 0.5);
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(15, 17, 21, 0.06);
+    box-shadow: var(--shadow-card);
   }
 
-  /* Radial glow for backgrounds */
-  .radial-glow {
-    background-image: radial-gradient(circle at 50% -20%, rgba(255, 210, 23, 0.08) 0%, rgba(0, 0, 0, 0) 60%);
-  }
-
-  /* Background mesh glow */
-  .bg-mesh-glow {
-    background-image:
-      radial-gradient(at 0% 0%, rgba(255, 210, 23, 0.1) 0px, transparent 50%),
-      radial-gradient(at 100% 100%, rgba(255, 210, 23, 0.05) 0px, transparent 50%);
-    background-attachment: fixed;
-  }
-
-  .gold-glow {
-    box-shadow: 0 0 30px rgba(255, 210, 23, 0.15);
-  }
-
-  /* --------------------------------------------------------- chips ---- */
   .chip {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    border-radius: 0;
-    padding: 0.2rem 0.5rem;
+    border-radius: 9999px;
+    padding: 0.25rem 0.6rem;
     font-family: var(--font-mono);
     font-size: 11px;
     line-height: 1.4;
@@ -347,274 +287,139 @@ h6 {
     text-transform: uppercase;
     font-weight: 600;
     border: 1px solid var(--color-rule);
-    background: linear-gradient(145deg, rgba(255, 210, 23, 0.1), rgba(0, 0, 0, 0.5));
+    background: #f4f5f7;
     color: var(--color-ink-soft);
   }
   .chip-live {
-    background: linear-gradient(135deg, rgba(255, 210, 23, 0.3), rgba(215, 173, 9, 0.14));
-    border-color: #ffd217;
-    color: #fef08a;
+    background: #fce7f3;
+    border-color: rgba(246, 10, 168, 0.25);
+    color: #f60aa8;
   }
   .chip-ink {
-    background: var(--gradient-box-strong);
-    border-color: #ffd217;
-    color: #050704;
+    background: #f60aa8;
+    border-color: #f60aa8;
+    color: #ffffff;
   }
 
-  /* -------------------------------------------------------- inputs ---- */
   .input-field {
-    background: #0b0b0b;
-    border: 1px solid var(--color-rule);
+    background: #f4f5f7;
+    border: 1px solid transparent;
     color: var(--color-ink);
     font-weight: 500;
-    border-radius: 0;
-    transition: border-color 0.14s ease, box-shadow 0.14s ease;
+    border-radius: 16px;
+    transition: border-color 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
   }
   .input-field::placeholder {
-    color: rgba(244, 247, 241, 0.42);
+    color: var(--color-ink-mute);
     font-weight: 500;
   }
-
   .input-field:focus {
     outline: none;
-    border-color: #ffd217;
-    box-shadow: 2px 2px 0 0 rgba(255, 210, 23, 0.5);
+    background: #ffffff;
+    border-color: rgba(246, 10, 168, 0.4);
+    box-shadow: 0 0 0 3px rgba(246, 10, 168, 0.12);
   }
 
   select.input-field {
     appearance: none;
-    background-image: linear-gradient(45deg, transparent 50%, #ffd217 50%),
-      linear-gradient(135deg, #ffd217 50%, transparent 50%);
+    background-image: linear-gradient(45deg, transparent 50%, #8b909a 50%),
+      linear-gradient(135deg, #8b909a 50%, transparent 50%);
     background-position: calc(100% - 16px) 52%, calc(100% - 11px) 52%;
     background-size: 5px 5px, 5px 5px;
     background-repeat: no-repeat;
     padding-right: 2rem;
   }
   select.input-field option {
-    background: #0b0b0b;
+    background: #ffffff;
     color: var(--color-ink);
   }
 
-  /* --------------------------------------------------------- misc ---- */
   .seg {
     display: inline-flex;
     border: 1px solid var(--color-rule);
-    background: #0b0b0b;
+    background: #ffffff;
+    border-radius: 9999px;
+    padding: 3px;
+    gap: 2px;
   }
   .seg > button {
-    font-family: var(--font-mono);
-    font-size: 11px;
+    font-family: var(--font-sans);
+    font-size: 13px;
     font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    letter-spacing: -0.01em;
     padding: 0 0.85rem;
     color: var(--color-ink-mute);
     cursor: pointer;
+    border-radius: 9999px;
     transition: background-color 0.12s ease, color 0.12s ease;
+    border: none;
   }
   .seg > button + button {
-    border-left: 1px solid var(--color-rule);
+    border-left: none;
   }
   .seg > button:hover {
-    color: #fef08a;
+    color: var(--color-ink);
   }
   .seg > button[data-active="true"] {
-    background: var(--gradient-box-strong);
-    color: #050704;
+    background: #f60aa8;
+    color: #ffffff;
   }
 
   .meter {
-    height: 6px;
-    background: rgba(244, 247, 241, 0.08);
-    border: 1px solid var(--color-rule);
+    height: 8px;
+    background: #eef0f3;
+    border-radius: 9999px;
     overflow: hidden;
   }
   .meter > span {
     display: block;
     height: 100%;
-    background: var(--gradient-box-strong);
+    background: linear-gradient(90deg, #f60aa8, #ff4db8);
+    border-radius: 9999px;
   }
   .meter-live > span {
-    background: var(--gradient-box-strong);
+    background: linear-gradient(90deg, #f60aa8, #ff4db8);
   }
 
   .link-underline {
     text-decoration: underline;
     text-underline-offset: 3px;
     text-decoration-thickness: 1px;
-    text-decoration-color: rgba(255, 210, 23, 0.45);
+    text-decoration-color: rgba(246, 10, 168, 0.35);
   }
   .link-underline:hover {
-    text-decoration-color: #ffd217;
-  }
-
-  .scrollbar-thin-green::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  .scrollbar-thin-green::-webkit-scrollbar-thumb {
-    background: rgba(255, 210, 23, 0.4);
+    text-decoration-color: #f60aa8;
   }
 
   @keyframes blink {
-    0%,
-    49% {
-      opacity: 1;
-    }
-    50%,
-    100% {
-      opacity: 0.15;
-    }
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0.15; }
   }
   .animate-blink {
     animation: blink 1.2s steps(1) infinite;
   }
 
   @keyframes gem-float {
-    0%,
-    100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(-6px);
-    }
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
   }
   .animate-gem-float {
     animation: gem-float 5s ease-in-out infinite;
   }
 
   @keyframes marquee {
-    from {
-      transform: translateX(0);
-    }
-    to {
-      transform: translateX(-50%);
-    }
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
   }
   .animate-marquee {
     animation: marquee 38s linear infinite;
   }
-}
 
-/* ------------------------------------------------------------------ */
-/* Legacy light-theme literals used across the components, remapped   */
-/* onto the black + yellow system. These pages were authored          */
-/* for a cream page, so `bg-white` panels become gradient boxes and    */
-/* `bg-ink` slabs (which were the dark accent) become yellow.          */
-/* ------------------------------------------------------------------ */
-
-/* White panels -> yellow gradient boxes */
-[class~="bg-white"] {
-  background-color: #0b0b0a !important;
-  background-image: var(--gradient-box) !important;
-}
-[class~="hover\:bg-white"]:hover {
-  background-color: #131313 !important;
-}
-
-/* Page-level cream washes -> pure black */
-[class*="bg-cream"] {
-  background-color: rgba(0, 0, 0, 0.92) !important;
-  background-image: none !important;
-}
-
-/* The old dark accent slab -> yellow gradient */
-[class~="bg-ink"] {
-  background-image: var(--gradient-box-strong) !important;
-  color: #050704 !important;
-}
-
-/* Very low-alpha ink washes were near-invisible section tints on cream;
-   on black they must lighten, not darken. */
-[class="bg-ink\/\[0\.02\]"],
-[class~="bg-ink\/\[0\.02\]"],
-[class~="bg-ink\/\[0\.04\]"] {
-  background-color: rgba(255, 210, 23, 0.05) !important;
-}
-
-/* Hairline grid gaps */
-[class~="bg-ink\/12"] {
-  background-color: rgba(255, 210, 23, 0.2) !important;
-}
-[class~="hover\:bg-ink\/\[0\.04\]"]:hover {
-  background-color: rgba(255, 210, 23, 0.1) !important;
-}
-
-/* Borders */
-[class*="border-ink"] {
-  border-color: var(--color-rule) !important;
-}
-[class~="hover\:border-ink"]:hover {
-  border-color: #ffd217 !important;
-}
-
-/* Text colours */
-[class~="text-ink"] {
-  color: var(--color-ink) !important;
-}
-[class~="text-ink-soft"] {
-  color: var(--color-ink-soft) !important;
-}
-[class~="text-ink-mute"] {
-  color: var(--color-ink-mute) !important;
-}
-[class*="text-ink/"],
-[class*="text-black/"] {
-  color: var(--color-ink-soft) !important;
-}
-[class~="text-gem-50"] {
-  color: #050704 !important;
-}
-
-/* Hard-coded ink drop shadows -> yellow */
-[class*="shadow-[4px_4px_0_0_#0d0f0c]"]:hover,
-[class*="shadow-[4px_4px_0_0_#0d0f0c]"] {
-  --tw-shadow-color: rgba(255, 210, 23, 0.45);
-  box-shadow: 4px 4px 0 0 rgba(255, 210, 23, 0.45) !important;
-}
-
-/* GemFot green references -> yellow gradient */
-.text-gem-300,
-[class~="text-gem-300"] {
-  color: #fde047 !important;
-}
-.text-gem-500,
-[class~="text-gem-500"] {
-  color: #ffd217 !important;
-}
-.text-gem-600,
-[class~="text-gem-600"] {
-  color: #eab308 !important;
-}
-.text-gem-700,
-[class~="text-gem-700"] {
-  color: #d9b400 !important;
-}
-.bg-gem-50,
-[class~="bg-gem-50"] {
-  background-color: #1a180a !important;
-}
-.bg-gem-100,
-[class~="bg-gem-100"] {
-  background-color: #2a2712 !important;
-}
-.bg-gem-300,
-[class~="bg-gem-300"] {
-  background-color: #4a4518 !important;
-}
-.bg-gem-500,
-[class~="bg-gem-500"] {
-  background-color: #675c10 !important;
-}
-.bg-gem-600,
-[class~="bg-gem-600"] {
-  background-color: #7a6c10 !important;
-}
-.bg-gem-700,
-[class~="bg-gem-700"] {
-  background-color: #8c7e10 !important;
-}
-.bg-gem-800,
-[class~="text-gem-800"] {
-  color: #986b00 !important;
+  @keyframes card-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-card-in {
+    animation: card-in 0.4s ease-out both;
+  }
 }

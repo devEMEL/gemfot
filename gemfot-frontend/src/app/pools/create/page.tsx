@@ -211,7 +211,7 @@ export default function CreatePoolPage() {
                 key={tier.label}
                 onClick={() => {setFeeTier(tier.label);setTickSpacing(tier.spacing)}}
                 className={`flex flex-col text-left transition-all relative overflow-hidden group border-t-2 cursor-pointer ${feeTier === tier.label
-                  ? 'bg-white/[0.04] border-primary shadow-[inset_0_0_20px_rgba(255,210,23,0.05)]'
+                  ? 'bg-white/[0.04] border-primary shadow-[inset_0_0_20px_rgba(184,134,11,0.05)]'
                   : 'bg-white/[0.01] border-white/5 hover:bg-white/[0.02] hover:border-white/10'
                   }`}
               >

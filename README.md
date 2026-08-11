@@ -2,7 +2,7 @@
 
 **Fair-launch memecoin protocol on Arc (Uniswap V4).**
 
-GemFot is a Uniswap V4 hook that takes a memecoin from idea to token launch to live trading. It pairs a bonding-curve fair launch with automated liquidity provisioning so that when the fair launch curve completes, USDC raised becomes permanent liquidity. Additionally, a BidWall provides plunge protection during trading by placing single-sided bids one tick below spot. It automatically rebalances when threshold conditions are met, catching falling prices and preventing cascading dumps.
+GemFot is a Uniswap V4 hook that takes a memecoin from token launch to live trading. It pairs a bonding-curve fair launch with automated liquidity provisioning so that when the fair launch curve completes, USDC raised becomes permanent liquidity. Additionally, a BidWall provides plunge protection during trading by placing single-sided bids one tick below spot. It automatically rebalances when threshold conditions are met, catching falling prices and preventing cascading dumps.
 
 
 ## Core concept

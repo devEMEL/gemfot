@@ -485,7 +485,7 @@ export default function PoolDetailsPage() {
                 <p className="text-3xl text-primary tracking-tight">24.8%</p>
               </div>
               <div className="mt-4 flex items-center gap-2">
-                <span className="w-2 h-2 bg-primary rounded-full animate-pulse shadow-[0_0_10px_rgba(255,210,23,0.5)]"></span>
+                <span className="w-2 h-2 bg-primary rounded-full animate-pulse shadow-[0_0_10px_rgba(184,134,11,0.5)]"></span>
                 <span className="text-[12px] text-white/40">Top 1% of Pools</span>
               </div>
               */}

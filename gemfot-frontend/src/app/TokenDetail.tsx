@@ -19,13 +19,14 @@ import { countdown, fmtNative, fmtToken, progressPct, shortAddress, timeAgo } fr
 import { quoteFairLaunchBuy } from '@/lib/fairLaunchQuote';
 import Erc20Abi from '@/abi/ERC20.json';
 
-/** Square ledger cell — matches the Explore stat strip. */
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function StatPill({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="bg-black px-4 py-3.5 flex flex-col justify-between min-w-0">
-      <span className="eyebrow">{label}</span>
-      <p className="num text-[20px] font-semibold text-yellow-300 leading-none mt-2.5 truncate">{value}</p>
-      {hint && <p className="mono text-[10px] text-white/30 mt-1.5 truncate">{hint}</p>}
+    <div className="bg-white rounded-2xl px-4 py-3.5 shadow-[0_1px_4px_rgba(15,17,21,0.04)] border border-black/[0.06] min-w-0">
+      <p className="text-[11px] font-semibold text-black/40 truncate">{label}</p>
+      <p className="text-[18px] font-extrabold text-black tabular-nums leading-tight mt-1 truncate">
+        {value}
+      </p>
+      {hint && <p className="text-[10px] font-medium text-black/30 mt-0.5 truncate">{hint}</p>}
     </div>
   );
 }
@@ -35,14 +36,13 @@ export default function TokenDetail() {
   const { launch, loading, error, refetch } = useLaunch(tokenAddress);
   const { address: account, isConnected } = useAccount();
 
-  const [side, setSide] = useState<'buy' | 'sell'>('buy');
+  const side = 'buy' as const;
   const [amount, setAmount] = useState('');
   const [copied, setCopied] = useState(false);
   const [, forceTick] = useState(0);
 
-  const { swap, step, error: swapError, txHash, isBusy, reset } = useSwap(tokenAddress);
+  const { swap, step, error: swapError, txHash, isBusy } = useSwap(tokenAddress);
 
-  // re-render every second so the countdown stays live
   useEffect(() => {
     const id = setInterval(() => forceTick((n) => n + 1), 1000);
     return () => clearInterval(id);
@@ -73,7 +73,6 @@ export default function TokenDetail() {
   const balanceDecimals = side === 'buy' ? CONTRACTS.nativeTokenDecimals : 18;
   const balanceLabel = balance ? formatUnits(balance, balanceDecimals) : '0';
 
-  /** Volume this token has done in the trailing 24h, from its buy feed. */
   const volume = useMemo(() => {
     if (!launch) return { day: 0n, all: 0n };
     const since = Math.floor(Date.now() / 1000) - 86_400;
@@ -103,24 +102,24 @@ export default function TokenDetail() {
 
   if (loading && !launch) {
     return (
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 pt-40 pb-24 flex flex-col items-center gap-3 bg-black min-h-screen">
-        <Loader2 size={22} className="animate-spin text-white/20" />
-        <p className="mono text-[11px] uppercase tracking-[0.16em] text-white/30">Loading token</p>
+      <div className="pt-[64px] min-h-screen flex flex-col items-center justify-center gap-3 py-40">
+        <Loader2 size={22} className="animate-spin text-[#f60aa8]" />
+        <p className="text-[13px] font-semibold text-black/40">Loading token…</p>
       </div>
     );
   }
 
   if (!launch) {
     return (
-      <div className="max-w-2xl mx-auto px-4 pt-40 pb-24 bg-black min-h-screen">
-        <div className="border border-yellow-400/20 bg-gradient-to-b from-yellow-500/5 to-transparent rounded-xl p-14 text-center flex flex-col items-center gap-3">
-          <p className="text-[18px] font-extrabold tracking-tight text-white">Token not found</p>
-          <p className="text-white/70 text-[14px]">
-            {error ?? 'This launch does not exist yet.'}
-          </p>
-          <Link to="/" className="btn btn-primary h-11 px-6 mt-2 yellow-gradient">
-            Back to explore
-          </Link>
+      <div className="pt-[64px] min-h-screen">
+        <div className="max-w-md mx-auto px-4 py-24">
+          <div className="bg-white rounded-[28px] p-12 text-center shadow-[0_2px_12px_rgba(15,17,21,0.06)] flex flex-col items-center gap-4">
+            <p className="text-[18px] font-extrabold text-black">Token not found</p>
+            <p className="text-black/50 text-[14px]">{error ?? 'This launch does not exist yet.'}</p>
+            <Link to="/" className="btn btn-primary h-11 px-7 mt-1">
+              Back to explore
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -129,20 +128,20 @@ export default function TokenDetail() {
   const links = launch.links ?? {};
 
   return (
-    <div className="pt-[58px] bg-black min-h-screen text-white">
-      {/* --------------------------------------------------- title bar -- */}
-      <div className="border-b border-yellow-400/10 bg-black/40">
-        <div className="max-w-[1400px] mx-auto px-4 md:px-6">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-1.5 mono text-[10px] uppercase tracking-[0.16em] text-white/30 hover:text-yellow-300 transition-colors pt-5"
-          >
-            <ArrowLeft size={12} />
-            All launches
-          </Link>
+    <div className="pt-[64px] min-h-screen">
+      <div className="max-w-[1200px] mx-auto px-4 md:px-6 py-6 md:py-8">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-black/40 hover:text-[#f60aa8] transition-colors mb-5"
+        >
+          <ArrowLeft size={14} />
+          All launches
+        </Link>
 
-          <div className="flex items-start gap-4 md:gap-5 py-5">
-            <div className="w-16 h-16 md:w-20 md:h-20 overflow-hidden border border-white/[0.08] shrink-0 flex items-center justify-center">
+        {/* Token header */}
+        <div className="bg-white rounded-[28px] p-5 md:p-6 shadow-[0_2px_12px_rgba(15,17,21,0.06)] border border-black/[0.06] mb-5">
+          <div className="flex items-start gap-4 md:gap-5">
+            <div className="w-20 h-20 md:w-24 md:h-24 rounded-[20px] overflow-hidden bg-[#f4f5f7] shrink-0 shadow-md flex items-center justify-center">
               {launch.imageUrl ? (
                 <img
                   src={launch.imageUrl}
@@ -150,7 +149,7 @@ export default function TokenDetail() {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <span className="mono text-yellow-300 font-semibold text-lg">
+                <span className="text-[#f60aa8] font-extrabold text-2xl">
                   {launch.symbol.slice(0, 3).toUpperCase()}
                 </span>
               )}
@@ -158,33 +157,39 @@ export default function TokenDetail() {
 
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2.5 mb-2">
-                <h1 className="display text-[28px] md:text-[38px] text-white">{launch.name}</h1>
-                <span className="mono text-[13px] text-white/40">{launch.symbol}</span>
+                <h1 className="text-[26px] md:text-[32px] font-extrabold tracking-tight text-black leading-none">
+                  {launch.name}
+                </h1>
+                <span className="text-[15px] font-bold text-black/35">${launch.symbol}</span>
                 {launch.isLive ? (
                   <span className="chip chip-live">
-                    <span className="w-1 h-1 rounded-full bg-yellow-300 animate-blink" />
-                    Curve open · {countdown(Number(launch.fairLaunchEndsAt))}
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#f60aa8] animate-blink" />
+                    {countdown(Number(launch.fairLaunchEndsAt))}
                   </span>
                 ) : (
                   <span className="chip chip-ink">Trading live</span>
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={copyAddress}
-                  className="chip hover:border-yellow-400/30 transition-colors cursor-pointer"
+                  className="chip hover:border-[#f60aa8]/30 transition-colors cursor-pointer"
                 >
-                  {copied ? <Check size={11} className="text-yellow-300" /> : <Copy size={11} className="text-yellow-300" />}
+                  {copied ? (
+                    <Check size={11} className="text-[#f60aa8]" />
+                  ) : (
+                    <Copy size={11} />
+                  )}
                   {shortAddress(launch.memecoin, 6)}
                 </button>
                 <a
                   href={explorerAddress(launch.memecoin)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="chip hover:border-yellow-400/30 transition-colors"
+                  className="chip hover:border-[#f60aa8]/30 transition-colors"
                 >
-                  <ExternalLink size={11} className="text-yellow-300" />
+                  <ExternalLink size={11} />
                   Explorer
                 </a>
                 <span className="chip">
@@ -195,58 +200,37 @@ export default function TokenDetail() {
             </div>
           </div>
         </div>
-      </div>
 
-      {/* ------------------------------------------------- stat ledger -- */}
-      <div className="border-b border-yellow-400/10 bg-black/40">
-        <div className="max-w-[1400px] mx-auto px-4 md:px-6">
-          <div className="grid grid-cols-2 lg:grid-cols-6 gap-px bg-yellow-400/5 border-x border-yellow-400/10">
-            <Stat
-              label="Volume · 24h"
-              value={fmtNative(volume.day.toString())}
-              hint={CONTRACTS.nativeTokenSymbol}
-            />
-            <Stat
-              label="Volume · all time"
-              value={fmtNative(volume.all.toString())}
-              hint={CONTRACTS.nativeTokenSymbol}
-            />
-            <Stat
-              label="Raised"
-              value={fmtNative(launch.revenue)}
-              hint={CONTRACTS.nativeTokenSymbol}
-            />
-            <Stat
-              label="Target MC"
-              value={fmtNative(launch.targetMarketCap)}
-              hint={CONTRACTS.nativeTokenSymbol}
-            />
-            <Stat label="Buys" value={String(launch.buyCount)} hint="Fair launch trades" />
-            <Stat
-              label="Remaining"
-              value={fmtToken(launch.remainingSupply)}
-              hint={`of ${fmtToken(launch.initialTokenFairLaunch)}`}
-            />
-          </div>
+        {/* Stats */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mb-5">
+          <StatPill label="Volume · 24h" value={`$${fmtNative(volume.day.toString())}`} hint={CONTRACTS.nativeTokenSymbol} />
+          <StatPill label="Volume · all time" value={`$${fmtNative(volume.all.toString())}`} hint={CONTRACTS.nativeTokenSymbol} />
+          <StatPill label="Raised" value={`$${fmtNative(launch.revenue)}`} hint={CONTRACTS.nativeTokenSymbol} />
+          <StatPill label="Target MC" value={`$${fmtNative(launch.targetMarketCap)}`} hint={CONTRACTS.nativeTokenSymbol} />
+          <StatPill label="Buys" value={String(launch.buyCount)} hint="Fair launch trades" />
+          <StatPill
+            label="Remaining"
+            value={fmtToken(launch.remainingSupply)}
+            hint={`of ${fmtToken(launch.initialTokenFairLaunch)}`}
+          />
         </div>
-      </div>
 
-      {/* ------------------------------------------------------- body -- */}
-      <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-8">
-        <div className="grid lg:grid-cols-[1.6fr_1fr] gap-6 items-start">
-          {/* ---------------------------------------------------- left */}
+        <div className="grid lg:grid-cols-[1.55fr_1fr] gap-5 items-start">
+          {/* Left column */}
           <div className="space-y-5">
-            <div className="border border-white/[0.04] bg-gradient-to-b from-yellow-500/3 to-transparent rounded-xl p-5">
-              <div className="flex items-baseline justify-between mb-2">
-                <span className="eyebrow">Curve filled</span>
-                <span className="num text-[13px] font-semibold text-yellow-300">{pct.toFixed(2)}%</span>
+            <div className="bg-white rounded-[28px] p-5 md:p-6 shadow-[0_2px_12px_rgba(15,17,21,0.06)] border border-black/[0.06]">
+              <div className="flex items-baseline justify-between mb-3">
+                <span className="text-[13px] font-bold text-black/50">Curve filled</span>
+                <span className="text-[15px] font-extrabold text-[#f60aa8] tabular-nums">
+                  {pct.toFixed(2)}%
+                </span>
               </div>
               <div className={`meter ${launch.isLive ? 'meter-live' : ''}`}>
                 <span style={{ width: `${Math.min(Math.max(pct, 1), 100)}%` }} />
               </div>
 
               {launch.description && (
-                <p className="text-white/70 text-[14px] leading-relaxed mt-5 pt-5 border-t border-yellow-400/10">
+                <p className="text-black/60 text-[14px] leading-relaxed mt-5 pt-5 border-t border-black/[0.06]">
                   {launch.description}
                 </p>
               )}
@@ -258,7 +242,7 @@ export default function TokenDetail() {
                       href={links.website}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="btn btn-soft h-9 px-3.5 text-[13px]"
+                      className="btn btn-soft h-9 px-4 text-[12px]"
                     >
                       <Globe size={13} />
                       Website
@@ -269,7 +253,7 @@ export default function TokenDetail() {
                       href={links.twitter}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="btn btn-soft h-9 px-3.5 text-[13px]"
+                      className="btn btn-soft h-9 px-4 text-[12px]"
                     >
                       <Twitter size={13} />
                       Twitter
@@ -280,7 +264,7 @@ export default function TokenDetail() {
                       href={links.telegram}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="btn btn-soft h-9 px-3.5 text-[13px]"
+                      className="btn btn-soft h-9 px-4 text-[12px]"
                     >
                       <MessageCircle size={13} />
                       Telegram
@@ -290,47 +274,49 @@ export default function TokenDetail() {
               )}
             </div>
 
-            {/* --------------------------------------------- trade tape */}
-            <div className="border border-white/[0.04] bg-gradient-to-b from-yellow-500/3 to-transparent rounded-xl">
-              <div className="px-5 py-3 border-b border-yellow-400/10 flex items-center justify-between">
-                <h2 className="text-[14px] font-bold tracking-tight text-white">Trade tape</h2>
-                <span className="mono text-[10px] text-white/30 uppercase tracking-[0.14em]">
+            {/* Trade tape */}
+            <div className="bg-white rounded-[28px] overflow-hidden shadow-[0_2px_12px_rgba(15,17,21,0.06)] border border-black/[0.06]">
+              <div className="px-5 md:px-6 py-4 border-b border-black/[0.06] flex items-center justify-between">
+                <h2 className="text-[15px] font-extrabold text-black">Trade tape</h2>
+                <span className="text-[11px] font-bold text-black/30 uppercase tracking-[0.1em]">
                   {launch.buys.length} trades
                 </span>
               </div>
 
               {launch.buys.length === 0 ? (
-                <p className="px-5 py-14 text-center text-white/50 text-[14px]">
+                <p className="px-6 py-14 text-center text-black/40 text-[14px]">
                   No buys yet — be the first.
                 </p>
               ) : (
                 <>
-                  <div className="hidden sm:grid grid-cols-[1fr_1.2fr_1fr_auto] gap-4 px-5 py-2 border-b border-yellow-400/10 bg-yellow-500/5">
+                  <div className="hidden sm:grid grid-cols-[1fr_1.2fr_1fr_auto] gap-4 px-5 md:px-6 py-2.5 bg-[#f4f5f7]/80">
                     {['Buyer', 'Received', 'Paid', 'Time'].map((h) => (
-                      <span key={h} className="eyebrow text-white/40">
+                      <span key={h} className="text-[10px] font-bold uppercase tracking-[0.1em] text-black/30">
                         {h}
                       </span>
                     ))}
                   </div>
-                  <div className="divide-y divide-yellow-400/5">
+                  <div className="divide-y divide-black/[0.05]">
                     {launch.buys.map((b) => (
                       <a
                         key={b.id}
                         href={explorerTx(b.transactionHash)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="grid sm:grid-cols-[1fr_1.2fr_1fr_auto] gap-1 sm:gap-4 px-5 py-2.5 hover:bg-yellow-500/5 transition-colors items-baseline"
+                        className="grid sm:grid-cols-[1fr_1.2fr_1fr_auto] gap-1 sm:gap-4 px-5 md:px-6 py-3 hover:bg-[#fdf2f8]/60 transition-colors items-baseline"
                       >
-                        <span className="mono text-[12px] text-white/60">{shortAddress(b.buyer, 4)}</span>
-                        <span className="num text-[12px] text-white">
+                        <span className="text-[13px] font-medium text-black/50">
+                          {shortAddress(b.buyer, 4)}
+                        </span>
+                        <span className="text-[13px] font-bold text-black tabular-nums">
                           {fmtToken(b.tokensOut)}{' '}
-                          <span className="text-white/40">{launch.symbol}</span>
+                          <span className="text-black/35 font-medium">{launch.symbol}</span>
                         </span>
-                        <span className="num text-[12px] text-yellow-300">
+                        <span className="text-[13px] font-bold text-[#f60aa8] tabular-nums">
                           {fmtNative(b.nativeIn)}{' '}
-                          <span className="text-white/40">{CONTRACTS.nativeTokenSymbol}</span>
+                          <span className="text-black/35 font-medium">{CONTRACTS.nativeTokenSymbol}</span>
                         </span>
-                        <span className="mono text-[10px] text-white/30 sm:text-right">
+                        <span className="text-[11px] font-medium text-black/30 sm:text-right">
                           {timeAgo(Number(b.timestamp))}
                         </span>
                       </a>
@@ -341,154 +327,126 @@ export default function TokenDetail() {
             </div>
           </div>
 
-          {/* --------------------------------------------------- right */}
-          <div className="lg:sticky lg:top-[74px] space-y-5">
-            <div className="border border-white/[0.04] bg-gradient-to-b from-yellow-500/3 to-transparent rounded-xl overflow-hidden">
+          {/* Right: buy widget + details */}
+          <div className="lg:sticky lg:top-[80px] space-y-5">
+            <div className="bg-white rounded-[28px] overflow-hidden shadow-[0_2px_12px_rgba(15,17,21,0.06)] border border-black/[0.06]">
               {launch.isLive ? (
-                <>
-                  {/* Buy-only trading during fair launch — sell disabled
-                  <div className="grid grid-cols-2 border-b border-yellow-400/10">
-                    {(['buy', 'sell'] as const).map((s) => (
+                <div className="p-5 md:p-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[12px] font-bold text-black/45">
+                      You pay · {side === 'buy' ? CONTRACTS.nativeTokenSymbol : launch.symbol}
+                    </span>
+                    <button
+                      onClick={() => setAmount(balanceLabel)}
+                      className="text-[12px] font-semibold text-black/35 hover:text-[#f60aa8] cursor-pointer"
+                    >
+                      BAL{' '}
+                      {Number(balanceLabel).toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                    </button>
+                  </div>
+
+                  <input
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                    placeholder="0.00"
+                    inputMode="decimal"
+                    className="input-field num w-full h-14 px-4 text-[24px] font-extrabold mb-3"
+                  />
+
+                  {side === 'buy' && amount && Number(amount) > 0 && launch && (
+                    <div className="mb-4 px-4 py-3 bg-[rgba(246,10,168,0.08)] rounded-2xl flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-black/40">Estimated receive</span>
+                      <span className="text-[14px] font-extrabold text-[#f60aa8] tabular-nums">
+                        ≈{' '}
+                        {fmtToken(
+                          (() => {
+                            const nativeIn = parseUnits(amount, CONTRACTS.nativeTokenDecimals);
+                            const quote = quoteFairLaunchBuy(
+                              {
+                                targetMarketCap: launch.targetMarketCap,
+                                initialTokenFairLaunch: launch.initialTokenFairLaunch,
+                                multiple: launch.multiple,
+                                remainingSupply: launch.remainingSupply,
+                              },
+                              nativeIn
+                            );
+                            return quote.tokensOut.toString();
+                          })()
+                        )}{' '}
+                        {launch.symbol}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="seg w-full h-9 mb-4">
+                    {['25', '50', '75', '100'].map((p) => (
                       <button
-                        key={s}
+                        key={p}
                         onClick={() => {
-                          setSide(s);
-                          setAmount('');
-                          reset();
+                          const v = (Number(balanceLabel) * Number(p)) / 100;
+                          setAmount(v ? String(v) : '');
                         }}
-                        className={`h-11 text-[13px] font-bold uppercase tracking-[0.1em] transition-colors cursor-pointer ${
-                          side === s
-                            ? s === 'buy'
-                              ? 'bg-yellow-400 text-black'
-                              : 'bg-black text-yellow-300'
-                            : 'text-white/40 hover:text-white'
-                        } ${s === 'sell' ? 'border-l border-yellow-400/10' : ''}`}
+                        className="flex-1 text-[12px]"
                       >
-                        {s}
+                        {p}%
                       </button>
                     ))}
                   </div>
-                  */}
-                  <div className="p-5">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="eyebrow">
-                        You pay · {side === 'buy' ? CONTRACTS.nativeTokenSymbol : launch.symbol}
-                      </span>
-                      <button
-                        onClick={() => setAmount(balanceLabel)}
-                        className="mono text-[10px] text-white/40 hover:text-white cursor-pointer"
-                      >
-                        BAL{' '}
-                        {Number(balanceLabel).toLocaleString(undefined, { maximumFractionDigits: 4 })}
-                      </button>
-                    </div>
 
-                    <input
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
-                      placeholder="0.00"
-                      inputMode="decimal"
-                      className="input-field num w-full h-14 px-4 text-[24px] font-semibold mb-2.5"
-                    />
-
-                    {side === 'buy' && amount && Number(amount) > 0 && launch && (
-                      <div className="mb-3 px-3.5 py-2.5 bg-yellow-500/10 border border-yellow-400/20 rounded-lg flex items-center justify-between">
-                        <span className="eyebrow text-[11px] text-white/40">Estimated receive</span>
-                        <span className="num text-[14px] font-bold text-yellow-300">
-                          ≈ {fmtToken(
-                            (() => {
-                              const nativeIn = parseUnits(
-                                amount,
-                                CONTRACTS.nativeTokenDecimals
-                              );
-                              const quote = quoteFairLaunchBuy(
-                                {
-                                  targetMarketCap: launch.targetMarketCap,
-                                  initialTokenFairLaunch: launch.initialTokenFairLaunch,
-                                  multiple: launch.multiple,
-                                  remainingSupply: launch.remainingSupply,
-                                },
-                                nativeIn
-                              );
-                              return quote.tokensOut.toString();
-                            })()
-                          )} {launch.symbol}
-                        </span>
-                      </div>
+                  <button
+                    onClick={onSwap}
+                    disabled={!isConnected || isBusy || !amount}
+                    className="btn btn-primary w-full h-13 py-3.5 text-[15px]"
+                  >
+                    {isBusy ? (
+                      <>
+                        <Loader2 size={15} className="animate-spin" />
+                        {step === 'approving'
+                          ? 'Approving…'
+                          : step === 'signing'
+                            ? 'Confirm in wallet…'
+                            : 'Confirming…'}
+                      </>
+                    ) : (
+                      <>Buy {launch.symbol}</>
                     )}
+                  </button>
 
-                    <div className="seg w-full h-8 mb-4">
-                      {['25', '50', '75', '100'].map((p) => (
-                        <button
-                          key={p}
-                          onClick={() => {
-                            const v = (Number(balanceLabel) * Number(p)) / 100;
-                            setAmount(v ? String(v) : '');
-                          }}
-                          className="flex-1"
-                        >
-                          {p}%
-                        </button>
-                      ))}
-                    </div>
+                  {!isConnected && (
+                    <p className="text-[12px] font-medium text-black/35 text-center mt-3">
+                      Connect a wallet to buy
+                    </p>
+                  )}
 
-                    <button
-                      onClick={onSwap}
-                      disabled={!isConnected || isBusy || !amount}
-                      className="btn w-full py-3.5 text-[14px] yellow-gradient"
+                  {swapError && (
+                    <p className="mt-3 text-[12px] text-red-500 break-words leading-relaxed">
+                      {swapError}
+                    </p>
+                  )}
+
+                  {step === 'done' && txHash && (
+                    <a
+                      href={explorerTx(txHash)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-3 flex items-center justify-center gap-2 text-[12px] font-bold text-[#f60aa8] hover:text-[#d00890]"
                     >
-                      {isBusy ? (
-                        <>
-                          <Loader2 size={15} className="animate-spin" />
-                          {step === 'approving'
-                            ? 'Approving…'
-                            : step === 'signing'
-                              ? 'Confirm in wallet…'
-                              : 'Confirming…'}
-                        </>
-                      ) : (
-                        <>
-                          Buy {launch.symbol}
-                        </>
-                      )}
-                    </button>
-
-                    {!isConnected && (
-                      <p className="mono text-[10px] uppercase tracking-[0.14em] text-white/40 text-center mt-3">
-                        Connect a wallet to buy
-                      </p>
-                    )}
-
-                    {swapError && (
-                      <p className="mt-3 mono text-[11px] text-danger break-words leading-relaxed">
-                        {swapError}
-                      </p>
-                    )}
-
-                    {step === 'done' && txHash && (
-                      <a
-                        href={explorerTx(txHash)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mt-3 flex items-center justify-center gap-1.5 mono text-[11px] text-yellow-300 hover:text-yellow-200"
-                      >
-                        <Check size={12} className="text-yellow-300" />
-                        Trade confirmed — view tx
-                      </a>
-                    )}
-                  </div>
-                </>
+                      <Check size={12} />
+                      Trade confirmed — view tx
+                    </a>
+                  )}
+                </div>
               ) : (
-                <div className="p-6 flex flex-col items-center text-center">
+                <div className="p-8 flex flex-col items-center text-center">
                   <span className="chip chip-ink mb-4">Trading live</span>
-                  <p className="text-white/70 text-[14px] max-w-[42ch] mb-4">
+                  <p className="text-black/55 text-[14px] max-w-[40ch] mb-6">
                     This token has graduated from the fair launch curve and is now trading on MLSwap.
                   </p>
                   <a
                     href={`https://app.mlswapx.xyz/pools/${launch.poolId}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="btn btn-primary h-12 px-6 text-[14px] yellow-gradient inline-flex items-center gap-2"
+                    className="btn btn-primary h-12 px-7 text-[14px] inline-flex items-center gap-2"
                   >
                     Trade on MLSwap
                     <ExternalLink size={15} />
@@ -497,38 +455,69 @@ export default function TokenDetail() {
               )}
             </div>
 
-            <div className="border border-white/[0.04] bg-gradient-to-b from-yellow-500/3 to-transparent rounded-xl overflow-hidden">
-              <div className="px-5 py-3 border-b border-yellow-400/10">
-                <h3 className="text-[14px] font-bold tracking-tight text-white">Launch details & parameters</h3>
-              </div>
-              <div className="divide-y divide-yellow-400/5">
+            <div className="bg-white rounded-[28px] p-5 md:p-6 shadow-[0_2px_12px_rgba(15,17,21,0.06)] border border-black/[0.06]">
+              <h3 className="text-[15px] font-extrabold text-black mb-4">Parameters</h3>
+              <div className="grid grid-cols-2 gap-3">
                 {[
-                  ['Fair launch supply', fmtToken(launch.initialTokenFairLaunch)],
-                  ['Duration', `${(Number(launch.fairLaunchDuration) / 3600).toFixed(2)} hours`],
-                  [
-                    'Deadline',
-                    launch.fairLaunchEndsAt && Number(launch.fairLaunchEndsAt) > 0
-                      ? new Date(Number(launch.fairLaunchEndsAt) * 1000).toLocaleString()
-                      : 'N/A',
-                  ],
-                  [
-                    'Starts at (flaunchesAt)',
-                    launch.fairLaunchStartsAt && Number(launch.fairLaunchStartsAt) > 0
-                      ? new Date(Number(launch.fairLaunchStartsAt) * 1000).toLocaleString()
-                      : 'Immediate',
-                  ],
-                  ['Premine', fmtToken(launch.premineAmount)],
-                  ['Creator fee', `${Number(launch.creatorFeeAllocation) / 100}%`],
-                  ['Multiple', `${launch.multiple}×`],
-                  ['Pool ID', shortAddress(launch.poolId, 6)],
-                  ['Currency Flipped', launch.currencyFlipped ? 'Yes' : 'No'],
-                  ['Status', launch.fairLaunchClosed ? 'Closed' : launch.isLive ? 'Live' : 'Ended'],
-                ].map(([k, v]) => (
-                  <div key={k} className="flex items-baseline justify-between px-5 py-2.5">
-                    <span className="text-[13px] text-white/40">{k}</span>
-                    <span className="num text-[13px] font-semibold text-white">{v}</span>
+                  {
+                    label: 'Fair launch supply',
+                    value: fmtToken(launch.initialTokenFairLaunch),
+                  },
+                  {
+                    label: 'Duration',
+                    value: `${(Number(launch.fairLaunchDuration) / 3600).toFixed(1)}h`,
+                  },
+                  {
+                    label: 'Creator fee',
+                    value: `${Number(launch.creatorFeeAllocation) / 100}%`,
+                  },
+                  {
+                    label: 'Multiple',
+                    value: `${launch.multiple}×`,
+                  },
+                  {
+                    label: 'Starts',
+                    value:
+                      launch.fairLaunchStartsAt && Number(launch.fairLaunchStartsAt) > 0
+                        ? new Date(Number(launch.fairLaunchStartsAt) * 1000).toLocaleDateString(
+                            undefined,
+                            { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }
+                          )
+                        : 'Immediate',
+                  },
+                  {
+                    label: 'Ends',
+                    value:
+                      launch.fairLaunchEndsAt && Number(launch.fairLaunchEndsAt) > 0
+                        ? new Date(Number(launch.fairLaunchEndsAt) * 1000).toLocaleDateString(
+                            undefined,
+                            { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }
+                          )
+                        : '—',
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.label}
+                    className="rounded-2xl bg-[#f7f7f8] px-3.5 py-3 min-w-0"
+                  >
+                    <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-black/35 truncate">
+                      {item.label}
+                    </p>
+                    <p className="text-[14px] font-extrabold text-black mt-1 truncate tabular-nums">
+                      {item.value}
+                    </p>
                   </div>
                 ))}
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-3 px-1">
+                <span className="text-[12px] font-medium text-black/40">Status</span>
+                <span
+                  className={`chip ${
+                    launch.isLive ? 'chip-live' : launch.fairLaunchClosed ? '' : 'chip-ink'
+                  }`}
+                >
+                  {launch.fairLaunchClosed ? 'Closed' : launch.isLive ? 'Live' : 'Ended'}
+                </span>
               </div>
             </div>
           </div>

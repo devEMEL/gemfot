@@ -214,7 +214,7 @@
 //             <div className="pt-2">
 //               <button 
 //                 disabled={loading}
-//                 className={`w-full py-5 rounded-full bg-primary text-black  uppercase tracking-[0.3em] text-xs transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,210,23,0.15)] hover:shadow-primary/40 ${loading ? 'opacity-50 cursor-not-allowed' : 'hover:brightness-110 active:scale-[0.98]'}`}
+//                 className={`w-full py-5 rounded-full bg-primary text-black  uppercase tracking-[0.3em] text-xs transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(184,134,11,0.15)] hover:shadow-primary/40 ${loading ? 'opacity-50 cursor-not-allowed' : 'hover:brightness-110 active:scale-[0.98]'}`}
 //                 type="submit"
 //               >
 //                 {loading ? 'Processing...' : 'Add token to list'}

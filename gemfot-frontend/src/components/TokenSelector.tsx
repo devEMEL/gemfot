@@ -118,7 +118,7 @@ const TokenSelector: React.FC<TokenSelectorProps> = ({
           onClick={() => { setIsOpen(false); setSearchQuery(""); }}
         >
           <div
-            className="relative w-full max-w-xl h-[90vh] glass-morphism bg-[#0A0A0A] border border-primary/30 p-10 shadow-[0_0_50px_rgba(255,210,23,0.1)] animate-in zoom-in-95 duration-300 flex flex-col items-center overflow-hidden text-center"
+            className="relative w-full max-w-xl h-[90vh] glass-morphism bg-[#0A0A0A] border border-primary/30 p-10 shadow-[0_0_50px_rgba(184,134,11,0.1)] animate-in zoom-in-95 duration-300 flex flex-col items-center overflow-hidden text-center"
             /* Stop click from bubbling up to backdrop */
             onClick={(e) => e.stopPropagation()}
           >

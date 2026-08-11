@@ -366,7 +366,7 @@
 //                     disabled={isFromPool && feeTier !== tier.label}
 //                     onClick={() => setFeeTier(tier.label)}
 //                     className={`flex flex-col text-left transition-all relative overflow-hidden group border-t-2 ${feeTier === tier.label
-//                       ? 'bg-white/[0.04] border-primary shadow-[inset_0_0_20px_rgba(255,210,23,0.05)]'
+//                       ? 'bg-white/[0.04] border-primary shadow-[inset_0_0_20px_rgba(184,134,11,0.05)]'
 //                       : isFromPool
 //                         ? 'bg-white/[0.01] border-white/5 opacity-50 cursor-not-allowed'
 //                         : 'bg-white/[0.01] border-white/5 hover:bg-white/[0.02] hover:border-white/10'
@@ -1072,7 +1072,7 @@ export default function CreatePositionPage() {
                     disabled={isFromPool && feeTier !== tier.label}
                     onClick={() => setFeeTier(tier.label)}
                     className={`flex flex-col text-left transition-all relative overflow-hidden group border-t-2 ${feeTier === tier.label
-                      ? 'bg-white/[0.04] border-primary shadow-[inset_0_0_20px_rgba(255,210,23,0.05)]'
+                      ? 'bg-white/[0.04] border-primary shadow-[inset_0_0_20px_rgba(184,134,11,0.05)]'
                       : isFromPool
                         ? 'bg-white/[0.01] border-white/5 opacity-50 cursor-not-allowed'
                         : 'bg-white/[0.01] border-white/5 hover:bg-white/[0.02] hover:border-white/10'
