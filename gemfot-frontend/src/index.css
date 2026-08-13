@@ -3,11 +3,12 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Raleway", "Ubuntu", ui-sans-serif, sans-serif;
-  --font-mono: "basierCircle", "Ubuntu Mono", ui-monospace, monospace;
+  --font-sans: "GemFot Sans", "Raleway", ui-sans-serif, sans-serif;
+  --font-mono: "Ubuntu", ui-sans-serif, sans-serif;
   --font-display: "bbTorsoPro", "Raleway", ui-sans-serif, sans-serif;
   --font-raleway: "Raleway", ui-sans-serif, sans-serif;
   --font-ubuntu: "Ubuntu", ui-sans-serif, sans-serif;
+  --font-num: "Ubuntu", ui-sans-serif, sans-serif;
 
   --color-pink-500: #f60aa8;
   --color-pink-600: #d00890;
@@ -61,12 +62,31 @@
   --shadow-card-hover: 0 8px 28px rgba(15, 17, 21, 0.1), 0 2px 8px rgba(15, 17, 21, 0.06);
 }
 
+/* Digits & numeric punctuation → Ubuntu; everything else → Raleway */
+@font-face {
+  font-family: "GemFot Sans";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: local("Ubuntu Light"), local("Ubuntu");
+  unicode-range:
+    U+0024, U+0025, U+002B, U+002C, U+002D, U+002E, U+0030-0039, U+003A, U+00D7, U+2212;
+}
+
+@font-face {
+  font-family: "GemFot Sans";
+  font-style: normal;
+  font-weight: 300 900;
+  font-display: swap;
+  src: local("Raleway");
+}
+
 html,
 body,
 #root {
   background-color: #f7f7f8;
   color: var(--color-ink);
-  font-family: "Raleway", "Ubuntu", ui-sans-serif, sans-serif;
+  font-family: "GemFot Sans", "Raleway", ui-sans-serif, sans-serif;
   font-size: 16px;
   font-weight: 500;
   font-variant-numeric: lining-nums tabular-nums;
@@ -107,20 +127,25 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 @layer utilities {
+  .font-ubuntu,
+  .num,
+  .tabular-nums {
+    font-family: "Ubuntu", ui-sans-serif, sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+
   .mono {
-    font-family: var(--font-mono);
+    font-family: "Raleway", ui-sans-serif, sans-serif;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
-    font-feature-settings: "zero" 1;
+    letter-spacing: 0.02em;
   }
   .num {
-    font-family: var(--font-mono);
     font-weight: 600;
-    font-variant-numeric: tabular-nums;
     letter-spacing: -0.02em;
   }
   .eyebrow {
-    font-family: var(--font-mono);
+    font-family: "Raleway", ui-sans-serif, sans-serif;
     font-size: 10px;
     line-height: 1;
     letter-spacing: 0.14em;
@@ -282,7 +307,7 @@ h1, h2, h3, h4, h5, h6 {
     gap: 0.35rem;
     border-radius: 9999px;
     padding: 0.25rem 0.6rem;
-    font-family: var(--font-mono);
+    font-family: var(--font-raleway);
     font-size: 11px;
     line-height: 1.4;
     letter-spacing: 0.04em;
